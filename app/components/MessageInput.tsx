@@ -48,12 +48,11 @@ export default function MessageInput({ value, onChange, onSend, targetCountry, l
           {isAnalyzing ? (
             <>
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              분석중
+              {t('analyzing')}
             </>
           ) : (
-            '전송'
+            t('sendButton')
           )}
-          {isAnalyzing ? t('analyzing') : t('sendButton')}
         </button>
       </div>
       <p className="text-xs text-gray-500 mt-2">

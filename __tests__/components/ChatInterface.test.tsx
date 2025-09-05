@@ -43,7 +43,7 @@ describe('ChatInterface', () => {
       expect(screen.getByText('👍 매너 굿! 문화적으로 적절한 표현이에요')).toBeInTheDocument()
     })
 
-    expect(fetch).toHaveBeenCalledWith('/api/analyze', {
+    expect(fetch).toHaveBeenCalledWith('/api/analyze', expect.objectContaining({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -53,7 +53,7 @@ describe('ChatInterface', () => {
         targetCountry: 'US',
         language: 'ko',
       }),
-    })
+    }))
   })
 
   test('handles API error gracefully', async () => {

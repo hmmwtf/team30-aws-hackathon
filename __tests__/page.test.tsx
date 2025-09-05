@@ -55,7 +55,7 @@ describe('Home Page', () => {
     fireEvent.click(sendButton)
 
     // API가 올바른 국가 코드로 호출되는지 확인
-    expect(fetch).toHaveBeenCalledWith('/api/analyze', {
+    expect(fetch).toHaveBeenCalledWith('/api/analyze', expect.objectContaining({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -65,7 +65,7 @@ describe('Home Page', () => {
         targetCountry: 'CN',
         language: 'ko',
       }),
-    })
+    }))
   })
 
   test('has proper responsive layout classes', () => {

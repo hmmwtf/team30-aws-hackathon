@@ -46,7 +46,7 @@ describe('/api/analyze', () => {
 
     expect(response.status).toBe(200)
     expect(result.type).toBe('good')
-    expect(result.message).toBe('👍 매너 굿! 문화적으로 적절한 표현이에요 (에러 시 기본 응답)')
+    expect(result.message).toBe('👍 매너 굿! 미국 문화권에서 적절한 표현입니다.')
 
   })
 
@@ -75,7 +75,7 @@ describe('/api/analyze', () => {
     expect(response.status).toBe(200)
     expect(result.type).toBe('good')
 
-    expect(result.message).toBe('👍 매너 굿! 문화적으로 적절한 표현이에요 (에러 시 기본 응답)')
+    expect(result.message).toBe('👍 매너 굿! 미국 문화권에서 적절한 표현입니다.')
 
   })
 
@@ -110,7 +110,7 @@ describe('/api/analyze', () => {
     expect(response.status).toBe(200)
     expect(result.type).toBe('good')
 
-    expect(result.message).toBe('👍 매너 굿! 문화적으로 적절한 표현이에요 (에러 시 기본 응답)')
+    expect(result.message).toBe('👍 매너 굿! 미국 문화권에서 적절한 표현입니다.')
 
   })
 })

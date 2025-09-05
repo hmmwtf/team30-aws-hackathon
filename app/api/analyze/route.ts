@@ -40,28 +40,23 @@ export async function POST(request: NextRequest) {
 
     const countryName = countryNames[targetCountry as keyof typeof countryNames] || targetCountry
 
+    // 문화 데이터 가져오기
+    const culturalData = getCulturalData(targetCountry)
+    
     const prompts = {
       ko: `당신은 문화적 매너 전문가입니다. 다음 메시지가 ${countryName} 문화권에서 적절한지 분석해주세요.
 
 메시지: "${message}"
 대상 국가: ${countryName}
+민감주제: ${culturalData?.sensitiveTopic.join(', ') || '없음'}
+금기사항: ${culturalData?.taboos.join(', ') || '없음'}
 
 ${targetCountry === 'KR' ? 
   '한국 문화의 특징을 고려하세요: 존댓말과 높임법, 나이와 지위에 따른 예의, 집단주의 문화, 체면과 인간관계 중시, 직접적 표현보다는 완곡한 표현 선호' : 
   '해당 국가의 문화적 특성과 금기사항, 예의범절을 고려하세요.'}
 
-    // 문화 데이터 가져오기
-    const culturalData = getCulturalData(targetCountry)
-    
-    // 간소화된 프롬프트로 속도 향상
-    const prompt = `메시지: "${message}"
-국가: ${targetCountry} (${culturalData?.country})
-민감주제: ${culturalData?.sensitiveTopic.join(', ') || '없음'}
-금기사항: ${culturalData?.taboos.join(', ') || '없음'}
-
-
 이 메시지가 ${targetCountry} 문화에서 적절한지 분석하고 JSON으로 응답:
-{"type":"warning"|"good","message":"피드백","suggestion":"제안","culturalReason":"이유"}`
+{"type":"warning"|"good","message":"피드백","suggestion":"제안","culturalReason":"이유"}
 
 문화적으로 민감하거나 부적절한 표현이 있다면 "warning", 적절하다면 "good"으로 분류하세요.`,
       en: `You are a cultural manner expert. Please analyze if the following message is appropriate in ${countryName} culture.

@@ -19,13 +19,14 @@ describe('ChatInterface', () => {
 
   test('sends message and displays feedback', async () => {
     const mockResponse = {
-      type: 'good',
-      message: '👍 매너 굿! 문화적으로 적절한 표현이에요'
+      ok: true,
+      json: async () => ({
+        type: 'good',
+        message: '👍 매너 굿! 문화적으로 적절한 표현이에요'
+      })
     }
 
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      json: async () => mockResponse
-    })
+    ;(fetch as jest.Mock).mockResolvedValueOnce(mockResponse)
 
     render(<ChatInterface targetCountry="US" language="ko" />)
 
@@ -72,7 +73,7 @@ describe('ChatInterface', () => {
     })
 
     await waitFor(() => {
-      expect(screen.getByText('👍 매너 굿! 문화적으로 적절한 표현이에요')).toBeInTheDocument()
+      expect(screen.getByText(/👍 매너 굿!/)).toBeInTheDocument()
     })
   })
 

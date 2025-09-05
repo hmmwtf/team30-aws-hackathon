@@ -8,8 +8,10 @@ export interface Message {
     type: 'warning' | 'good'
     message: string
     suggestion?: string
+    confidence?: number
   }
   translation?: string
+  translatedText?: string
   isTranslating?: boolean
   isPending?: boolean
   isAnalyzing?: boolean

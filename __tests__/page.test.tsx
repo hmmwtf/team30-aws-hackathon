@@ -55,15 +55,17 @@ describe('Home Page', () => {
     fireEvent.click(sendButton)
 
     // API가 올바른 국가 코드로 호출되는지 확인
-    expect(fetch).toHaveBeenCalledWith('/api/analyze', expect.objectContaining({
+    expect(fetch).toHaveBeenCalledWith('/api/translate-analyze', expect.objectContaining({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        message: 'Hello',
+        text: 'Hello',
+        targetLanguage: '',
+        sourceLanguage: 'auto',
         targetCountry: 'CN',
-        language: 'ko',
+        userLanguage: 'ko'
       }),
     }))
   })

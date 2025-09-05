@@ -14,8 +14,7 @@ interface MessageInputProps {
 export default function MessageInput({ value, onChange, onSend, targetCountry, language }: MessageInputProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
 
-  const t = (key: keyof typeof import('../lib/i18n').translations.ko) => 
-    getTranslation(language, key)
+  const t = (key: string) => getTranslation(language, key)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

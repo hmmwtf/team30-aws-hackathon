@@ -8,6 +8,7 @@ import { Language, getTranslation } from '../lib/i18n'
 interface ChatInterfaceProps {
   targetCountry: string
   language: Language
+  onMessageSent?: () => void
 }
 
 interface Message {
@@ -33,12 +34,11 @@ interface Message {
   suggestedTranslation?: string
 }
 
-export default function ChatInterface({ targetCountry, language }: ChatInterfaceProps) {
+export default function ChatInterface({ targetCountry, language, onMessageSent }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [currentInput, setCurrentInput] = useState('')
 
-  const t = (key: keyof typeof import('../lib/i18n').translations.ko) => 
-    getTranslation(language, key)
+  const t = (key: string) => getTranslation(language, key)
 
   const handleSendMessage = async (text: string) => {
     const newMessage: Message = {
@@ -117,6 +117,7 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
           : msg
       )
     )
+    onMessageSent?.()
   }
 
   const handleCancelMessage = (messageId: string) => {

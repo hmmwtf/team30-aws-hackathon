@@ -152,8 +152,7 @@ const countries = {
 }
 
 export default function CountrySelector({ selectedCountry, onCountryChange, language }: CountrySelectorProps) {
-  const t = (key: keyof typeof import('../lib/i18n').translations.ko) => 
-    getTranslation(language, key)
+  const t = (key: string) => getTranslation(language, key)
 
   const countryList = countries[language] || countries.ko
 

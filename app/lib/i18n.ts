@@ -37,6 +37,60 @@ export const translations = {
     chatMode: '💬 채팅 모드',
     translateMode: '🌐 번역 모드',
     suggestion: '제안',
+    sponsor: {
+      title: '서비스가 도움이 되셨나요?',
+      message: '지금까지 {{count}}번 사용하셨습니다. 서비스 개선을 위해 후원이나 리뷰를 부탁드립니다!',
+      later: '나중에',
+      support: '후원하기',
+      account: {
+        title: '후원 계좌',
+        bank: '은행',
+        number: '계좌번호',
+        name: '예금주'
+      },
+      review: {
+        title: '리뷰 남기기',
+        message: '별점과 리뷰로 응원해주세요!'
+      },
+      page: {
+        title: 'CultureChat 후원하기',
+        subtitle: '문화적 배려가 담긴 AI 번역 서비스를 응원해주세요',
+        donation: {
+          title: '후원하기',
+          message: '여러분의 소중한 후원이 더 나은 서비스를 만듭니다.'
+        },
+        review: {
+          title: '리뷰 남기기',
+          message: '서비스가 도움이 되셨다면 별점과 리뷰를 남겨주세요!',
+          button: '리뷰 작성하기'
+        },
+        about: {
+          title: '서비스 소개',
+          feature1: {
+            title: '문화적 매너 체크',
+            desc: '각 국가의 문화를 고려한 표현 분석'
+          },
+          feature2: {
+            title: 'AI 번역',
+            desc: 'AWS 기반 고품질 실시간 번역'
+          },
+          feature3: {
+            title: '실시간 피드백',
+            desc: '즉각적인 문화적 조언 제공'
+          }
+        },
+        contact: {
+          title: '연락처'
+        }
+      }
+    },
+    ad: {
+      title: 'CultureChat - 무료 체험',
+      subtitle: '문화적 배려가 담긴 AI 번역 서비스',
+      feature1: '실시간 번역',
+      feature2: '매너 체크',
+      feature3: '문화 분석'
+    }
   },
   en: {
     title: 'CultureChat',
@@ -61,6 +115,60 @@ export const translations = {
     chatMode: '💬 Chat Mode',
     translateMode: '🌐 Translate Mode',
     suggestion: 'Suggestion',
+    sponsor: {
+      title: 'Did our service help you?',
+      message: 'You have used our service {{count}} times. Please consider supporting us with a donation or review!',
+      later: 'Later',
+      support: 'Support Us',
+      account: {
+        title: 'Donation Account',
+        bank: 'Bank',
+        number: 'Account Number',
+        name: 'Account Holder'
+      },
+      review: {
+        title: 'Leave a Review',
+        message: 'Please support us with stars and reviews!'
+      },
+      page: {
+        title: 'Support CultureChat',
+        subtitle: 'Support our AI translation service with cultural consideration',
+        donation: {
+          title: 'Make a Donation',
+          message: 'Your valuable support helps us create better services.'
+        },
+        review: {
+          title: 'Leave a Review',
+          message: 'If our service was helpful, please leave us stars and reviews!',
+          button: 'Write Review'
+        },
+        about: {
+          title: 'About Our Service',
+          feature1: {
+            title: 'Cultural Manner Check',
+            desc: 'Expression analysis considering each country\'s culture'
+          },
+          feature2: {
+            title: 'AI Translation',
+            desc: 'High-quality real-time translation based on AWS'
+          },
+          feature3: {
+            title: 'Real-time Feedback',
+            desc: 'Instant cultural advice provision'
+          }
+        },
+        contact: {
+          title: 'Contact Us'
+        }
+      }
+    },
+    ad: {
+      title: 'CultureChat - Free Trial',
+      subtitle: 'AI translation service with cultural consideration',
+      feature1: 'Real-time Translation',
+      feature2: 'Manner Check',
+      feature3: 'Cultural Analysis'
+    }
   },
   ja: {
     title: 'CultureChat',
@@ -256,6 +364,32 @@ export const translations = {
   },
 }
 
-export function getTranslation(language: Language, key: keyof typeof translations.ko): string {
-  return translations[language]?.[key] || translations.ko[key]
+export function getTranslation(language: Language, key: string, variables?: Record<string, string | number>): string {
+  const keys = key.split('.')
+  let value: any = translations[language] || translations.ko
+  
+  for (const k of keys) {
+    value = value?.[k]
+    if (value === undefined) break
+  }
+  
+  if (value === undefined) {
+    // fallback to Korean
+    value = translations.ko
+    for (const k of keys) {
+      value = value?.[k]
+      if (value === undefined) break
+    }
+  }
+  
+  let result = value || key
+  
+  // 템플릿 변수 처리
+  if (variables && typeof result === 'string') {
+    Object.entries(variables).forEach(([varKey, varValue]) => {
+      result = result.replace(new RegExp(`{{${varKey}}}`, 'g'), String(varValue))
+    })
+  }
+  
+  return result
 }

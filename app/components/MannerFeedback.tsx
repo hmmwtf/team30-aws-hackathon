@@ -13,8 +13,7 @@ interface MannerFeedbackProps {
 }
 
 export default function MannerFeedback({ feedback, language }: MannerFeedbackProps) {
-  const t = (key: keyof typeof import('../lib/i18n').translations.ko) => 
-    getTranslation(language, key)
+  const t = (key: string) => getTranslation(language, key)
   const isWarning = feedback.type === 'warning'
   
   return (

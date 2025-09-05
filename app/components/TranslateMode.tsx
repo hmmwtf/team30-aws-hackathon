@@ -7,16 +7,16 @@ import MannerFeedback from './MannerFeedback'
 interface TranslateModeProps {
   targetCountry: string
   language: Language
+  onTranslate?: () => void
 }
 
-export default function TranslateMode({ targetCountry, language }: TranslateModeProps) {
+export default function TranslateMode({ targetCountry, language, onTranslate }: TranslateModeProps) {
   const [inputText, setInputText] = useState('')
   const [result, setResult] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [targetLang, setTargetLang] = useState('en')
 
-  const t = (key: keyof typeof import('../lib/i18n').translations.ko) => 
-    getTranslation(language, key)
+  const t = (key: string) => getTranslation(language, key)
 
   const handleTranslate = async () => {
     if (!inputText.trim()) return
@@ -38,6 +38,7 @@ export default function TranslateMode({ targetCountry, language }: TranslateMode
 
       const data = await response.json()
       setResult(data)
+      onTranslate?.()
     } catch (error) {
       console.error('Translation failed:', error)
     } finally {

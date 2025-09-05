@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import MessageInput from './MessageInput'
 import MannerFeedback from './MannerFeedback'
+import TranslationHistory, { addToHistory } from './TranslationHistory'
 import { Language, getTranslation } from '../lib/i18n'
 
 interface ChatInterfaceProps {
@@ -36,6 +37,23 @@ interface Message {
 export default function ChatInterface({ targetCountry, language }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [currentInput, setCurrentInput] = useState('')
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [showCopyToast, setShowCopyToast] = useState(false)
+
+  // 복사 기능
+  const copyToClipboard = async (text: string, messageId: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedId(messageId)
+      setShowCopyToast(true)
+      setTimeout(() => {
+        setCopiedId(null)
+        setShowCopyToast(false)
+      }, 1500)
+    } catch (err) {
+      console.error('복사 실패:', err)
+    }
+  }
 
   const t = (key: keyof typeof import('../lib/i18n').translations.ko) => 
     getTranslation(language, key)
@@ -74,6 +92,11 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
       }
       
       const result = await response.json()
+      
+      // 히스토리에 추가
+      if (result.translatedText) {
+        addToHistory(text, result.translatedText, targetCountry)
+      }
       
       // 분석 완료된 메시지로 업데이트
       setMessages(prev => 
@@ -177,9 +200,19 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
       <div className="h-96 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => (
           <div key={message.id} className="space-y-2">
-            <div className={`p-3 rounded-lg max-w-xs ml-auto relative group ${
+            <div className={`p-3 rounded-lg max-w-xs ml-auto relative ${
               message.isPending ? 'bg-yellow-100 border-2 border-yellow-300' : 'bg-blue-100'
             }`}>
+              {/* 복사 버튼 - 오른쪽 맨위 */}
+              {message.translatedText && (
+                <button
+                  onClick={() => copyToClipboard(message.translatedText!, message.id)}
+                  className="absolute -top-2 -right-2 w-6 h-6 bg-gray-300 hover:bg-gray-400 text-gray-600 rounded-full flex items-center justify-center text-xs transition-colors shadow-md"
+                  title="번역 결과 복사"
+                >
+                  {copiedId === message.id ? '✓' : '📋'}
+                </button>
+              )}
               {message.isAnalyzing ? (
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
@@ -234,6 +267,15 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
         targetCountry={targetCountry}
         language={language}
       />
+      
+      <TranslationHistory language={language} />
+      
+      {/* 복사 완료 토스트 */}
+      {showCopyToast && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-600 text-white px-4 py-2 rounded-lg shadow-lg z-50">
+          복사 완료! 📋
+        </div>
+      )}
     </div>
   )
 }

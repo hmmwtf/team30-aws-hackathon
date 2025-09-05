@@ -1,16 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import MessageInput from './MessageInput'
 import MannerFeedback from './MannerFeedback'
 import TranslationHistory, { addToHistory } from './TranslationHistory'
 import RelationshipSelector from './RelationshipSelector'
 import AlternativeSelector from './AlternativeSelector'
 import { Language, getTranslation } from '../lib/i18n'
+import { Message } from '../../types/message'
+import { Chat } from '../../types/chat'
 
 interface ChatInterfaceProps {
   targetCountry: string
   language: Language
+  chatId?: string
+  userId: string
 }
 
 interface Alternative {
@@ -19,32 +23,7 @@ interface Alternative {
   formalityLevel: 'formal' | 'semi-formal' | 'casual'
 }
 
-interface Message {
-  id: string
-  text: string
-  timestamp: Date
-  translation?: string
-  isTranslating?: boolean
-  feedback?: {
-    type: 'warning' | 'good'
-    message: string
-    suggestion?: string
-    alternatives?: Alternative[]
-    originalMessage?: string
-  }
-  translationFeedback?: {
-    type: 'warning' | 'good'
-    message: string
-    suggestion?: string
-  }
-  isPending?: boolean
-  translatedText?: string
-  isAnalyzing?: boolean
-  suggestedText?: string
-  suggestedTranslation?: string
-}
-
-export default function ChatInterface({ targetCountry, language }: ChatInterfaceProps) {
+export default function ChatInterface({ targetCountry, language, chatId, userId }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [currentInput, setCurrentInput] = useState('')
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -55,6 +34,61 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
     alternatives: Alternative[]
     originalMessage: string
   } | null>(null)
+  const [isConnected, setIsConnected] = useState(false)
+  const wsRef = useRef<WebSocket | null>(null)
+
+  useEffect(() => {
+    if (!chatId) return
+
+    // WebSocket 연결
+    const ws = new WebSocket('ws://localhost:8080')
+    wsRef.current = ws
+
+    ws.onopen = () => {
+      setIsConnected(true)
+      ws.send(JSON.stringify({
+        type: 'join',
+        userId,
+        chatId
+      }))
+    }
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data)
+      if (data.type === 'message') {
+        const newMessage: Message = {
+          id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          chatId: chatId,
+          userId: data.userId,
+          text: data.message,
+          timestamp: data.timestamp
+        }
+        setMessages(prev => [...prev, newMessage])
+      }
+    }
+
+    ws.onclose = () => {
+      setIsConnected(false)
+    }
+
+    // 기존 메시지 로드
+    loadMessages()
+
+    return () => {
+      ws.close()
+    }
+  }, [chatId, userId])
+
+  const loadMessages = async () => {
+    if (!chatId) return
+    try {
+      const response = await fetch(`/api/messages?chatId=${chatId}`)
+      const data = await response.json()
+      setMessages(data)
+    } catch (error) {
+      console.error('Failed to load messages:', error)
+    }
+  }
 
   // 복사 기능
   const copyToClipboard = async (text: string, messageId: string) => {
@@ -75,25 +109,26 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
     getTranslation(language, key)
 
   const handleSendMessage = async (text: string) => {
-    const newMessage: Message = {
-      id: Date.now().toString(),
+    if (!wsRef.current || !isConnected || !chatId) return
+
+    const tempMessage: Message = {
+      id: `temp_${Date.now()}`,
+      chatId,
+      userId,
       text,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
       isPending: true,
       isAnalyzing: true
     }
 
-    // 대기 중인 메시지 추가
-    setMessages(prev => [...prev, newMessage])
+    setMessages(prev => [...prev, tempMessage])
     setCurrentInput('')
 
     try {
-      // 관계별 매너 체크 + 대안 제시
-      const response = await fetch('/api/analyze-with-alternatives', {
+      // 매너 분석
+      const analyzeResponse = await fetch('/api/analyze-with-alternatives', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
           targetCountry,
@@ -102,51 +137,38 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
         })
       })
       
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
+      const analyzeResult = await analyzeResponse.json()
       
-      const result = await response.json()
-      
-      // 분석 완료된 메시지로 업데이트
       setMessages(prev => 
         prev.map(msg => 
-          msg.id === newMessage.id 
-            ? { 
-                ...msg, 
-                isAnalyzing: false,
-                feedback: result
-              }
+          msg.id === tempMessage.id 
+            ? { ...msg, isAnalyzing: false, feedback: analyzeResult }
             : msg
         )
       )
       
-      // 대안이 있으면 대안 선택 모달 표시
-      if (result.type === 'warning' && result.alternatives) {
+      if (analyzeResult.type === 'warning' && analyzeResult.alternatives) {
         setShowAlternatives({
-          messageId: newMessage.id,
-          alternatives: result.alternatives,
-          originalMessage: result.originalMessage || text
+          messageId: tempMessage.id,
+          alternatives: analyzeResult.alternatives,
+          originalMessage: text
         })
+        return
       }
+      
+      // 매너 체크 통과 시 WebSocket으로 전송
+      wsRef.current.send(JSON.stringify({
+        type: 'message',
+        message: text,
+        userId,
+        chatId
+      }))
+      
+      setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id))
       
     } catch (error) {
-      console.error('Translation/Analysis failed:', error)
-      
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === newMessage.id 
-            ? { 
-                ...msg, 
-                isAnalyzing: false,
-                feedback: {
-                  type: 'good' as const,
-                  message: '분석 중 오류가 발생했습니다. 원문을 그대로 보내시겠습니까?'
-                }
-              }
-            : msg
-        )
-      )
+      console.error('Message send failed:', error)
+      setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id))
     }
   }
 
@@ -165,47 +187,18 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
   }
 
   const handleAlternativeSelect = async (selectedText: string) => {
-    if (!showAlternatives) return
+    if (!showAlternatives || !wsRef.current || !isConnected) return
     
-    // 선택된 대안으로 메시지 업데이트
-    setMessages(prev => 
-      prev.map(msg => 
-        msg.id === showAlternatives.messageId 
-          ? { ...msg, text: selectedText, feedback: { type: 'good', message: '👍 매너 굿! 선택한 표현이 적절합니다.' } }
-          : msg
-      )
-    )
+    // WebSocket으로 선택된 대안 전송
+    wsRef.current.send(JSON.stringify({
+      type: 'message',
+      message: selectedText,
+      userId,
+      chatId
+    }))
     
-    // 번역 진행
-    try {
-      const response = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: selectedText,
-          targetLanguage: '',
-          sourceLanguage: 'auto',
-          targetCountry
-        })
-      })
-      
-      const result = await response.json()
-      
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === showAlternatives.messageId 
-            ? { ...msg, translatedText: result.translatedText }
-            : msg
-        )
-      )
-      
-      if (result.translatedText) {
-        addToHistory(selectedText, result.translatedText, targetCountry)
-      }
-    } catch (error) {
-      console.error('Translation failed:', error)
-    }
-    
+    // 임시 메시지 제거
+    setMessages(prev => prev.filter(msg => msg.id !== showAlternatives.messageId))
     setShowAlternatives(null)
   }
 
@@ -260,8 +253,16 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden">
       <div className="bg-blue-500 text-white p-4">
-        <h2 className="text-xl font-semibold">{t('chatTitle')}</h2>
-        <p className="text-blue-100">{t('chatSubtitle')}</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-semibold">{t('chatTitle')}</h2>
+            <p className="text-blue-100">{t('chatSubtitle')}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}></div>
+            <span className="text-sm">{isConnected ? 'Connected' : 'Disconnected'}</span>
+          </div>
+        </div>
       </div>
       
       <div className="p-4 border-b">
@@ -294,11 +295,16 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
                 </div>
               ) : (
                 <>
-                  <p className="font-medium">{t('originalMessage')}: {message.text}</p>
-                  {message.translatedText && (
+                  <div className="flex justify-between items-start">
+                    <p className="font-medium">{message.text}</p>
+                    <span className="text-xs text-gray-500 ml-2">
+                      {message.userId === userId ? 'You' : 'Friend'}
+                    </span>
+                  </div>
+                  {message.translation && (
                     <div className="mt-2 p-2 bg-white rounded text-sm">
                       <p className="text-gray-600 text-xs">{t('translatedMessage')}:</p>
-                      <p className="font-medium">{message.translatedText}</p>
+                      <p className="font-medium">{message.translation}</p>
                     </div>
                   )}
                   
@@ -321,7 +327,7 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
                   
                   <div className="mt-2">
                     <span className="text-xs text-gray-500">
-                      {message.timestamp.toLocaleTimeString()}
+                      {new Date(message.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
                 </>
@@ -333,6 +339,7 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
           </div>
         ))}
       </div>
+      
       
       <MessageInput
         value={currentInput}

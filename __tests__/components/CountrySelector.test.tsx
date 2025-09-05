@@ -12,10 +12,12 @@ describe('CountrySelector', () => {
     render(
       <CountrySelector 
         selectedCountry="US" 
-        onCountryChange={mockOnCountryChange} 
+        onCountryChange={mockOnCountryChange}
+        language="ko" 
       />
     )
 
+    expect(screen.getByText('🇰🇷 대한민국')).toBeInTheDocument()
     expect(screen.getByText('🇺🇸 미국')).toBeInTheDocument()
     expect(screen.getByText('🇯🇵 일본')).toBeInTheDocument()
     expect(screen.getByText('🇨🇳 중국')).toBeInTheDocument()
@@ -28,7 +30,8 @@ describe('CountrySelector', () => {
     render(
       <CountrySelector 
         selectedCountry="JP" 
-        onCountryChange={mockOnCountryChange} 
+        onCountryChange={mockOnCountryChange}
+        language="ko" 
       />
     )
 
@@ -40,7 +43,8 @@ describe('CountrySelector', () => {
     render(
       <CountrySelector 
         selectedCountry="US" 
-        onCountryChange={mockOnCountryChange} 
+        onCountryChange={mockOnCountryChange}
+        language="ko" 
       />
     )
 

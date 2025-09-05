@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "set NODE_OPTIONS=--openssl-legacy-provider && next dev",
+    "build": "set NODE_OPTIONS=--openssl-legacy-provider && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
@@ -16,6 +16,8 @@
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.450.0",
+
+    "@next/swc-win32-x64-msvc": "^15.5.2",
     "autoprefixer": "^10.4.16",
     "next": "14.0.0",
     "postcss": "^8.4.31",
@@ -26,10 +28,12 @@
     "tailwindcss": "^3.3.0"
   },
   "devDependencies": {
+
     "@playwright/test": "^1.55.0",
     "@testing-library/jest-dom": "^6.1.5",
     "@testing-library/react": "^14.1.2",
     "@testing-library/user-event": "^14.5.1",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",

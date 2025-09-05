@@ -3,15 +3,19 @@
 import { useState } from 'react'
 import MessageInput from './MessageInput'
 import MannerFeedback from './MannerFeedback'
+import { Language, getTranslation } from '../lib/i18n'
 
 interface ChatInterfaceProps {
   targetCountry: string
+  language: Language
 }
 
 interface Message {
   id: string
   text: string
   timestamp: Date
+  translation?: string
+  isTranslating?: boolean
   feedback?: {
     type: 'warning' | 'good'
     message: string
@@ -19,9 +23,12 @@ interface Message {
   }
 }
 
-export default function ChatInterface({ targetCountry }: ChatInterfaceProps) {
+export default function ChatInterface({ targetCountry, language }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [currentInput, setCurrentInput] = useState('')
+
+  const t = (key: keyof typeof import('../lib/i18n').translations.ko) => 
+    getTranslation(language, key)
 
   const handleSendMessage = async (text: string) => {
     const startTime = Date.now()
@@ -47,6 +54,7 @@ export default function ChatInterface({ targetCountry }: ChatInterfaceProps) {
         body: JSON.stringify({
           message: text,
           targetCountry,
+          language,
         }),
         signal: controller.signal
       })
@@ -72,6 +80,7 @@ export default function ChatInterface({ targetCountry }: ChatInterfaceProps) {
       console.log(`📈 [Client] Analysis completed in ${responseTime}ms`)
       
     } catch (error) {
+
       console.error('🚫 [Client] Analysis failed:', error)
       
       let errorMessage = '👍 매너 굿! 문화적으로 적절한 표현이에요'
@@ -82,6 +91,11 @@ export default function ChatInterface({ targetCountry }: ChatInterfaceProps) {
         } else if (error.message.includes('HTTP')) {
           errorMessage = '🌐 서버 오류가 발생했습니다. 기본 분석을 제공합니다.'
         }
+
+      console.error('Analysis service unavailable')
+      newMessage.feedback = {
+        type: 'good',
+        message: t('mannerGood')
       }
       
       setMessages(prev => 
@@ -102,24 +116,75 @@ export default function ChatInterface({ targetCountry }: ChatInterfaceProps) {
     }
   }
 
+  const handleTranslateMessage = async (messageId: string) => {
+    setMessages(prev => prev.map(msg => 
+      msg.id === messageId ? { ...msg, isTranslating: true } : msg
+    ))
+
+    try {
+      const message = messages.find(m => m.id === messageId)
+      if (!message) return
+
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: message.text,
+          targetLanguage: language === 'ko' ? 'English' : 'Korean',
+          sourceLanguage: language === 'ko' ? 'Korean' : 'English',
+        }),
+      })
+      
+      const { translation } = await response.json()
+      
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId 
+          ? { ...msg, translation, isTranslating: false }
+          : msg
+      ))
+    } catch (error) {
+      console.error('Translation failed')
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId ? { ...msg, isTranslating: false } : msg
+      ))
+    }
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden">
       <div className="bg-blue-500 text-white p-4">
-        <h2 className="text-xl font-semibold">채팅 창</h2>
-        <p className="text-blue-100">메시지를 입력하면 문화적 매너를 체크해드립니다</p>
+        <h2 className="text-xl font-semibold">{t('chatTitle')}</h2>
+        <p className="text-blue-100">{t('chatSubtitle')}</p>
       </div>
       
       <div className="h-96 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => (
           <div key={message.id} className="space-y-2">
-            <div className="bg-blue-100 p-3 rounded-lg max-w-xs ml-auto">
+            <div className="bg-blue-100 p-3 rounded-lg max-w-xs ml-auto relative group">
               <p>{message.text}</p>
-              <span className="text-xs text-gray-500">
-                {message.timestamp.toLocaleTimeString()}
-              </span>
+              {message.translation && (
+                <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
+                  <p className="text-gray-600 text-xs">{t('translatedMessage')}:</p>
+                  <p>{message.translation}</p>
+                </div>
+              )}
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-xs text-gray-500">
+                  {message.timestamp.toLocaleTimeString()}
+                </span>
+                <button
+                  onClick={() => handleTranslateMessage(message.id)}
+                  disabled={message.isTranslating}
+                  className="text-xs text-blue-600 hover:text-blue-800 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  {message.isTranslating ? t('translating') : t('translateMessage')}
+                </button>
+              </div>
             </div>
             {message.feedback && (
-              <MannerFeedback feedback={message.feedback} />
+              <MannerFeedback feedback={message.feedback} language={language} />
             )}
           </div>
         ))}
@@ -130,6 +195,7 @@ export default function ChatInterface({ targetCountry }: ChatInterfaceProps) {
         onChange={setCurrentInput}
         onSend={handleSendMessage}
         targetCountry={targetCountry}
+        language={language}
       />
     </div>
   )

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { TranscribeClient, StartTranscriptionJobCommand, GetTranscriptionJobCommand } from '@aws-sdk/client-transcribe'
+import { TranscribeClient, StartTranscriptionJobCommand, GetTranscriptionJobCommand, LanguageCode } from '@aws-sdk/client-transcribe'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 
 const transcribeClient = new TranscribeClient({
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
         MediaFileUri: `s3://${bucketName}/${key}`
       },
       MediaFormat: 'webm',
-      LanguageCode: languageCode
+      LanguageCode: languageCode as LanguageCode
     }))
 
     // 작업 완료 대기 (최대 30초)

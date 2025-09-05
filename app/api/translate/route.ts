@@ -40,8 +40,9 @@ Translation:`
     return NextResponse.json({ translation })
   } catch (error) {
     console.error('Translation error:', error)
+    const { message } = await request.json()
     return NextResponse.json({ 
-      translation: message,
+      translation: message || 'Translation failed',
       error: 'Translation service unavailable'
     })
   }

@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import MessageInput from './MessageInput'
-import MannerFeedback from './MannerFeedback'
-import TranslationHistory, { addToHistory } from './TranslationHistory'
+import EnhancedMannerFeedback from './EnhancedMannerFeedback'
+
 import RelationshipSelector from './RelationshipSelector'
 import AlternativeSelector from './AlternativeSelector'
 import { Language, getTranslation } from '../lib/i18n'
@@ -109,11 +109,11 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
     getTranslation(language, key)
 
   const handleSendMessage = async (text: string) => {
-    if (!wsRef.current || !isConnected || !chatId) return
-
-    const tempMessage: Message = {
-      id: `temp_${Date.now()}`,
-      chatId,
+    console.log('🔍 ChatInterface - targetCountry:', targetCountry)
+    
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      chatId: chatId || '',
       userId,
       text,
       timestamp: new Date().toISOString(),
@@ -121,58 +121,90 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
       isAnalyzing: true
     }
 
-    setMessages(prev => [...prev, tempMessage])
+    // 대기 중인 메시지 추가
+    setMessages(prev => [...prev, newMessage])
     setCurrentInput('')
 
     try {
-      // 매너 분석
-      const analyzeResponse = await fetch('/api/analyze-with-alternatives', {
+      // 🚀 빠른 매너 체크 + 번역 (병렬 처리)
+      const requestBody = {
+        message: text,
+        targetCountry,
+        relationship: selectedRelationship,
+        language
+      }
+      console.log('📤 Request body:', requestBody)
+      
+      const response = await fetch('/api/fast-analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          targetCountry,
-          relationship: selectedRelationship,
-          language
-        })
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
       })
       
-      const analyzeResult = await analyzeResponse.json()
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
       
+      const result = await response.json()
+      console.log('📥 API Response:', result)
+      
+      // 분석 완료된 메시지로 업데이트 (번역 결과 포함)
       setMessages(prev => 
         prev.map(msg => 
-          msg.id === tempMessage.id 
-            ? { ...msg, isAnalyzing: false, feedback: analyzeResult }
+          msg.id === newMessage.id 
+            ? { 
+                ...msg, 
+                isAnalyzing: false,
+                translatedText: result.basicTranslation,
+                feedback: result
+              }
             : msg
         )
       )
       
-      if (analyzeResult.type === 'warning' && analyzeResult.alternatives) {
+      // 대안이 있으면 대안 선택 모달 표시
+      if (result.type === 'warning' && result.alternatives) {
         setShowAlternatives({
-          messageId: tempMessage.id,
-          alternatives: analyzeResult.alternatives,
-          originalMessage: text
+          messageId: newMessage.id,
+          alternatives: result.alternatives,
+          originalMessage: result.originalMessage || text
         })
-        return
       }
       
-      // 매너 체크 통과 시 WebSocket으로 전송
-      wsRef.current.send(JSON.stringify({
-        type: 'message',
-        message: text,
-        userId,
-        chatId
-      }))
-      
-      setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id))
-      
     } catch (error) {
-      console.error('Message send failed:', error)
-      setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id))
+      console.error('Translation/Analysis failed:', error)
+      
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === newMessage.id 
+            ? { 
+                ...msg, 
+                isAnalyzing: false,
+                feedback: {
+                  type: 'good' as const,
+                  message: '분석 중 오류가 발생했습니다. 원문을 그대로 보내시겠습니까?'
+                }
+              }
+            : msg
+        )
+      )
     }
   }
 
   const handleConfirmSend = (messageId: string) => {
+    const message = messages.find(m => m.id === messageId)
+    if (message && wsRef.current && isConnected && chatId) {
+      // WebSocket으로 메시지 전송
+      wsRef.current.send(JSON.stringify({
+        type: 'message',
+        message: message.translatedText || message.text,
+        userId,
+        chatId
+      }))
+    }
+    
     setMessages(prev => 
       prev.map(msg => 
         msg.id === messageId 
@@ -186,23 +218,34 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
     setMessages(prev => prev.filter(msg => msg.id !== messageId))
   }
 
-  const handleAlternativeSelect = async (selectedText: string) => {
-    if (!showAlternatives || !wsRef.current || !isConnected) return
+  const handleAlternativeSelect = async (selectedText: string, translatedText?: string) => {
+    if (!showAlternatives) return
     
-    // WebSocket으로 선택된 대안 전송
-    wsRef.current.send(JSON.stringify({
-      type: 'message',
-      message: selectedText,
-      userId,
-      chatId
-    }))
+    // 선택된 대안으로 메시지 업데이트 (이미 번역된 텍스트 사용)
+    setMessages(prev => 
+      prev.map(msg => 
+        msg.id === showAlternatives.messageId 
+          ? { 
+              ...msg, 
+              text: selectedText, 
+              translatedText: translatedText || selectedText,
+              feedback: { 
+                type: 'good', 
+                message: '👍 매너 굿! 선택한 표현이 적절합니다.' 
+              } 
+            }
+          : msg
+      )
+    )
     
-    // 임시 메시지 제거
-    setMessages(prev => prev.filter(msg => msg.id !== showAlternatives.messageId))
     setShowAlternatives(null)
   }
 
   const handleAlternativeCancel = () => {
+    if (showAlternatives) {
+      // 메시지 제거
+      setMessages(prev => prev.filter(msg => msg.id !== showAlternatives.messageId))
+    }
     setShowAlternatives(null)
   }
 
@@ -251,7 +294,7 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+    <div className="h-full flex flex-col bg-white">
       <div className="bg-blue-500 text-white p-4">
         <div className="flex justify-between items-center">
           <div>
@@ -272,74 +315,99 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
         />
       </div>
       
-      <div className="h-96 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => (
-          <div key={message.id} className="space-y-2">
-            <div className={`p-3 rounded-lg max-w-xs ml-auto relative ${
-              message.isPending ? 'bg-yellow-100 border-2 border-yellow-300' : 'bg-blue-100'
-            }`}>
-              {/* 복사 버튼 - 오른쪽 맨위 */}
-              {message.translatedText && (
-                <button
-                  onClick={() => copyToClipboard(message.translatedText!, message.id)}
-                  className="absolute -top-2 -right-2 w-6 h-6 bg-gray-300 hover:bg-gray-400 text-gray-600 rounded-full flex items-center justify-center text-xs transition-colors shadow-md"
-                  title="번역 결과 복사"
-                >
-                  {copiedId === message.id ? '✓' : '📋'}
-                </button>
-              )}
-              {message.isAnalyzing ? (
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                  <p className="text-sm text-gray-600">{t('analyzingMessage')}</p>
-                </div>
-              ) : (
-                <>
-                  <div className="flex justify-between items-start">
-                    <p className="font-medium">{message.text}</p>
-                    <span className="text-xs text-gray-500 ml-2">
-                      {message.userId === userId ? 'You' : 'Friend'}
-                    </span>
-                  </div>
-                  {message.translation && (
-                    <div className="mt-2 p-2 bg-white rounded text-sm">
-                      <p className="text-gray-600 text-xs">{t('translatedMessage')}:</p>
-                      <p className="font-medium">{message.translation}</p>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-gray-500">
+            <div className="text-center">
+              <div className="text-4xl mb-4">💬</div>
+              <p>대화를 시작해보세요!</p>
+            </div>
+          </div>
+        ) : (
+          messages.map((message) => (
+            <div key={message.id} className="space-y-2">
+              <div className={`p-3 rounded-lg max-w-xs relative ${
+                message.userId === userId ? 'ml-auto bg-blue-100' : 'mr-auto bg-gray-100'
+              } ${
+                message.isPending ? 'border-2 border-yellow-300' : ''
+              }`}>
+                {/* 복사 버튼 - 오른쪽 맨위 */}
+                {(message.translatedText || message.translation) && (
+                  <button
+                    onClick={() => copyToClipboard(message.translatedText || message.translation!, message.id)}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-gray-300 hover:bg-gray-400 text-gray-600 rounded-full flex items-center justify-center text-xs transition-colors shadow-md"
+                    title="번역 결과 복사"
+                  >
+                    {copiedId === message.id ? '✓' : '📋'}
+                  </button>
+                )}
+                {message.isAnalyzing ? (
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    <p className="text-sm text-gray-600">🚀 빠른 분석 중... (2-3초)</p>
+                    <div className="mt-2 text-xs text-gray-500">
+                      매너 체크와 번역을 동시에 처리하고 있어요
                     </div>
-                  )}
-                  
-                  {message.isPending && (
-                    <div className="mt-3 flex gap-2">
-                      <button
-                        onClick={() => handleConfirmSend(message.id)}
-                        className="flex-1 bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600"
-                      >
-                        ✓ {t('sendButtonText')}
-                      </button>
-                      <button
-                        onClick={() => handleCancelMessage(message.id)}
-                        className="flex-1 bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
-                      >
-                        ✗ {t('cancelButtonText')}
-                      </button>
-                    </div>
-                  )}
-                  
-                  <div className="mt-2">
-                    <span className="text-xs text-gray-500">
-                      {new Date(message.timestamp).toLocaleTimeString()}
-                    </span>
                   </div>
-                </>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-start">
+                      <p className="font-medium">{t('originalMessage')}: {message.text}</p>
+                      <span className="text-xs text-gray-500 ml-2">
+                        {message.userId === userId ? 'You' : 'Friend'}
+                      </span>
+                    </div>
+                    {message.translatedText && (
+                      <div className="mt-2 p-2 bg-white rounded text-sm">
+                        <p className="text-gray-600 text-xs">{t('translatedMessage')}:</p>
+                        <p className="font-medium">{message.translatedText}</p>
+                      </div>
+                    )}
+                    {message.translation && (
+                      <div className="mt-2 p-2 bg-white rounded text-sm">
+                        <p className="text-gray-600 text-xs">{t('translatedMessage')}:</p>
+                        <p className="font-medium">{message.translation}</p>
+                      </div>
+                    )}
+                    
+                    {message.isPending && (
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() => handleConfirmSend(message.id)}
+                          className="flex-1 bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600"
+                        >
+                          ✓ {t('sendButtonText')}
+                        </button>
+                        <button
+                          onClick={() => handleCancelMessage(message.id)}
+                          className="flex-1 bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
+                        >
+                          ✗ {t('cancelButtonText')}
+                        </button>
+                      </div>
+                    )}
+                    
+                    <div className="mt-2">
+                      <span className="text-xs text-gray-500">
+                        {new Date(message.timestamp).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+              {message.feedback && (
+                <EnhancedMannerFeedback 
+                  feedback={{
+                    ...message.feedback,
+                    confidence: message.feedback.confidence || 0.8
+                  }} 
+                  language={language} 
+                />
               )}
             </div>
-            {message.feedback && (
-              <MannerFeedback feedback={message.feedback} language={language} />
-            )}
-          </div>
-        ))}
+          ))
+        )}
       </div>
-      
       
       <MessageInput
         value={currentInput}
@@ -348,8 +416,6 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
         targetCountry={targetCountry}
         language={language}
       />
-      
-      <TranslationHistory language={language} />
       
       {/* 복사 완료 토스트 */}
       {showCopyToast && (
@@ -363,6 +429,7 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
         <AlternativeSelector
           alternatives={showAlternatives.alternatives}
           originalMessage={showAlternatives.originalMessage}
+          targetCountry={targetCountry}
           onSelect={handleAlternativeSelect}
           onCancel={handleAlternativeCancel}
         />

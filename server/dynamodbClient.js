@@ -1,3 +1,4 @@
+require('dotenv').config({ path: '.env.local' })
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb')
 const { DynamoDBDocumentClient } = require('@aws-sdk/lib-dynamodb')
 

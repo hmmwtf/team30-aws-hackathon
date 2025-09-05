@@ -66,12 +66,12 @@ export default function Home() {
           </div>
 
           {mode === 'chat' ? (
-            <div className="flex bg-white rounded-lg shadow-lg overflow-hidden h-[600px]">
+            <div className="flex bg-white rounded-lg shadow-lg overflow-hidden" style={{height: '600px'}}>
               <ChatList 
                 onChatSelect={setSelectedChat}
                 selectedChatId={selectedChat?.id}
               />
-              <div className="flex-1">
+              <div className="flex-1 flex flex-col">
                 {selectedChat ? (
                   <ChatInterface 
                     targetCountry={selectedChat.country}

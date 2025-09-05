@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Language, getTranslation } from '../lib/i18n'
-import MannerFeedback from './MannerFeedback'
+import EnhancedMannerFeedback from './EnhancedMannerFeedback'
 
 interface TranslateModeProps {
   targetCountry: string
@@ -104,7 +104,13 @@ export default function TranslateMode({ targetCountry, language }: TranslateMode
             {result.mannerFeedback && (
               <div>
                 <h3 className="font-medium mb-2">문화적 매너 분석</h3>
-                <MannerFeedback feedback={result.mannerFeedback} language={language} />
+                <EnhancedMannerFeedback 
+                  feedback={{
+                    ...result.mannerFeedback,
+                    confidence: result.mannerFeedback.confidence || 0.8
+                  }} 
+                  language={language} 
+                />
               </div>
             )}
           </div>

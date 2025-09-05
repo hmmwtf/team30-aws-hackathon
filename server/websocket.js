@@ -1,3 +1,4 @@
+require('dotenv').config({ path: '.env.local' })
 const WebSocket = require('ws')
 const { dynamodb } = require('./dynamodbClient')
 const { PutCommand } = require('@aws-sdk/lib-dynamodb')

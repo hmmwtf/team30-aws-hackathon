@@ -1,6 +1,6 @@
 'use client'
 
-import { Language } from '../lib/i18n'
+import { Language, getTranslation } from '../lib/i18n'
 
 interface MannerFeedbackProps {
   feedback: {
@@ -13,6 +13,8 @@ interface MannerFeedbackProps {
 }
 
 export default function MannerFeedback({ feedback, language }: MannerFeedbackProps) {
+  const t = (key: keyof typeof import('../lib/i18n').translations.ko) => 
+    getTranslation(language, key)
   const isWarning = feedback.type === 'warning'
   
   return (
@@ -33,7 +35,7 @@ export default function MannerFeedback({ feedback, language }: MannerFeedbackPro
           </p>
           {feedback.suggestion && (
             <p className="text-sm text-gray-600 mt-1">
-              💡 <strong>제안:</strong> {feedback.suggestion}
+              💡 <strong>{t('suggestion')}:</strong> {feedback.suggestion}
             </p>
           )}
           {feedback.culturalReason && (

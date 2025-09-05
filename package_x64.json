@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "set NODE_OPTIONS=--openssl-legacy-provider && next dev",
+    "build": "set NODE_OPTIONS=--openssl-legacy-provider && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.450.0",
+    "@next/swc-win32-x64-msvc": "^15.5.2",
     "autoprefixer": "^10.4.16",
     "next": "^14.2.32",
     "postcss": "^8.4.31",

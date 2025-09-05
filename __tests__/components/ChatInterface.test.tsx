@@ -10,7 +10,7 @@ describe('ChatInterface', () => {
   })
 
   test('renders chat interface correctly', () => {
-    render(<ChatInterface targetCountry="US" />)
+    render(<ChatInterface targetCountry="US" language="ko" />)
 
     expect(screen.getByText('채팅 창')).toBeInTheDocument()
     expect(screen.getByText('메시지를 입력하면 문화적 매너를 체크해드립니다')).toBeInTheDocument()
@@ -27,7 +27,7 @@ describe('ChatInterface', () => {
       json: async () => mockResponse
     })
 
-    render(<ChatInterface targetCountry="US" />)
+    render(<ChatInterface targetCountry="US" language="ko" />)
 
     const input = screen.getByPlaceholderText('메시지를 입력하세요...')
     const sendButton = screen.getByText('전송')
@@ -51,6 +51,7 @@ describe('ChatInterface', () => {
       body: JSON.stringify({
         message: 'Hello, how are you?',
         targetCountry: 'US',
+        language: 'ko',
       }),
     })
   })
@@ -58,7 +59,7 @@ describe('ChatInterface', () => {
   test('handles API error gracefully', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('API Error'))
 
-    render(<ChatInterface targetCountry="US" />)
+    render(<ChatInterface targetCountry="US" language="ko" />)
 
     const input = screen.getByPlaceholderText('메시지를 입력하세요...')
     const sendButton = screen.getByText('전송')
@@ -85,7 +86,7 @@ describe('ChatInterface', () => {
       json: async () => mockResponse
     })
 
-    render(<ChatInterface targetCountry="US" />)
+    render(<ChatInterface targetCountry="US" language="ko" />)
 
     const input = screen.getByPlaceholderText('메시지를 입력하세요...')
     const sendButton = screen.getByText('전송')

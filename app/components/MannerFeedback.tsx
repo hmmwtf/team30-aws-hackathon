@@ -1,14 +1,17 @@
 'use client'
 
+import { Language } from '../lib/i18n'
+
 interface MannerFeedbackProps {
   feedback: {
     type: 'warning' | 'good'
     message: string
     suggestion?: string
   }
+  language: Language
 }
 
-export default function MannerFeedback({ feedback }: MannerFeedbackProps) {
+export default function MannerFeedback({ feedback, language }: MannerFeedbackProps) {
   const isWarning = feedback.type === 'warning'
   
   return (

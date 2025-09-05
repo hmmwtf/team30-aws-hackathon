@@ -24,12 +24,7 @@ const countries = {
   BR: { name: '브라질', flag: '🇧🇷' },
 }
 
-export default function ProfileSetupModal({ 
-  isOpen, 
-  onComplete, 
-  defaultLanguage = 'ko', 
-  currentProfile 
-}: ProfileSetupModalProps) {
+export default function ProfileSetupModal({ isOpen, onComplete, defaultLanguage = 'ko', currentProfile }: ProfileSetupModalProps) {
   const [selectedNationality, setSelectedNationality] = useState(currentProfile?.nationality || '')
   const [selectedLanguage, setSelectedLanguage] = useState<Language>(currentProfile?.language || defaultLanguage)
   const [isLoading, setIsLoading] = useState(false)
@@ -80,6 +75,7 @@ export default function ProfileSetupModal({
         </div>
 
         <div className="space-y-6">
+          {/* 국적 선택 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {selectedLanguage === 'ko' ? '국적' :
@@ -118,6 +114,7 @@ export default function ProfileSetupModal({
             </select>
           </div>
 
+          {/* 언어 선택 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {selectedLanguage === 'ko' ? '사용 언어' :
@@ -175,7 +172,6 @@ export default function ProfileSetupModal({
                selectedLanguage === 'ru' ? 'Завершить настройку' :
                selectedLanguage === 'hi' ? 'सेटअप पूरा करें' :
                selectedLanguage === 'pt' ? 'Concluir configuração' : '설정 완료')
-            }
           </button>
         </div>
       </div>

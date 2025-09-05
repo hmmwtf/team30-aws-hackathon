@@ -9,6 +9,7 @@ import AlternativeSelector from './AlternativeSelector'
 import { Language, getTranslation } from '../lib/i18n'
 import { Message } from '../../types/message'
 import { Chat } from '../../types/chat'
+import { getRandomLoadingMessage } from '../utils/loadingMessages'
 
 interface ChatInterfaceProps {
   targetCountry: string
@@ -36,6 +37,7 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
   } | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
+  const [loadingMessage] = useState(getRandomLoadingMessage())
 
   useEffect(() => {
     if (!chatId) return
@@ -135,7 +137,7 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
       }
       console.log('📤 Request body:', requestBody)
       
-      const response = await fetch('/api/fast-analyze', {
+      const response = await fetch('/api/hybrid-analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -144,11 +146,22 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
       })
       
       if (!response.ok) {
+        const errorText = await response.text()
+        console.error('😨 [API-ERROR]:', JSON.stringify({
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        }, null, 2))
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
       
       const result = await response.json()
-      console.log('📥 API Response:', result)
+      console.log('📥 [API-SUCCESS]:', JSON.stringify({
+        type: result.type,
+        hasTranslation: !!result.basicTranslation,
+        hasAlternatives: !!result.alternatives,
+        alternativeCount: result.alternatives?.length || 0
+      }, null, 2))
       
       // 분석 완료된 메시지로 업데이트 (번역 결과 포함)
       setMessages(prev => 
@@ -158,23 +171,81 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
                 ...msg, 
                 isAnalyzing: false,
                 translatedText: result.basicTranslation,
-                feedback: result
+                feedback: result,
+                // 매너 체크 통과 시 자동 전송 준비
+                isPending: result.type === 'warning' // warning이면 대기, good면 자동 전송
               }
             : msg
         )
       )
       
+      console.log('📥 API Response result:', result)
+      
       // 대안이 있으면 대안 선택 모달 표시
-      if (result.type === 'warning' && result.alternatives) {
-        setShowAlternatives({
-          messageId: newMessage.id,
-          alternatives: result.alternatives,
-          originalMessage: result.originalMessage || text
-        })
+      if (result.type === 'warning') {
+        if (result.alternatives) {
+          // hybrid-analyze에서 바로 대안 제공
+          setShowAlternatives({
+            messageId: newMessage.id,
+            alternatives: result.alternatives,
+            originalMessage: text
+          })
+        } else {
+          // 대안이 없으면 analyze-with-alternatives 호출
+          try {
+            const altResponse = await fetch('/api/analyze-with-alternatives', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message: text, targetCountry, relationship, language })
+            })
+            const altResult = await altResponse.json()
+            if (altResult.alternatives) {
+              setShowAlternatives({
+                messageId: newMessage.id,
+                alternatives: altResult.alternatives,
+                originalMessage: text
+              })
+            }
+          } catch (error) {
+            console.error('Failed to get alternatives:', error)
+          }
+        }
+      } else if (result.type === 'good') {
+        // 매너 체크 통과 시 자동으로 번역문 전송
+        setTimeout(() => {
+          if (wsRef.current && isConnected && chatId && result.basicTranslation) {
+            console.log('🚀 전송 데이터:', {
+              original: text,
+              translated: result.basicTranslation,
+              targetCountry,
+              sending: result.basicTranslation
+            })
+            wsRef.current.send(JSON.stringify({
+              type: 'message',
+              message: result.basicTranslation,
+              userId,
+              chatId
+            }))
+            
+            // 메시지 상태 업데이트
+            setMessages(prev => 
+              prev.map(msg => 
+                msg.id === newMessage.id 
+                  ? { ...msg, isPending: false }
+                  : msg
+              )
+            )
+          }
+        }, 1000) // 1초 후 자동 전송
       }
       
     } catch (error) {
-      console.error('Translation/Analysis failed:', error)
+      console.error('😨 [CHAT-ERROR]:', JSON.stringify({
+        error: error instanceof Error ? error.message : 'Unknown error',
+        message: text,
+        targetCountry,
+        timestamp: new Date().toISOString()
+      }, null, 2))
       
       setMessages(prev => 
         prev.map(msg => 
@@ -182,6 +253,7 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
             ? { 
                 ...msg, 
                 isAnalyzing: false,
+                isPending: true, // 사용자가 수동으로 전송 결정
                 feedback: {
                   type: 'good' as const,
                   message: '분석 중 오류가 발생했습니다. 원문을 그대로 보내시겠습니까?'
@@ -196,10 +268,14 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
   const handleConfirmSend = (messageId: string) => {
     const message = messages.find(m => m.id === messageId)
     if (message && wsRef.current && isConnected && chatId) {
-      // WebSocket으로 메시지 전송
+      // 번역문이 있으면 번역문만, 없으면 원문을 전송
+      const messageToSend = message.translatedText || message.text
+      console.log('📤 전송할 메시지:', messageToSend)
+      
+      // WebSocket으로 메시지 전송 (번역문만)
       wsRef.current.send(JSON.stringify({
         type: 'message',
-        message: message.translatedText || message.text,
+        message: messageToSend,
         userId,
         chatId
       }))
@@ -343,16 +419,20 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
                 )}
                 {message.isAnalyzing ? (
                   <div className="text-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                    <p className="text-sm text-gray-600">🚀 빠른 분석 중... (2-3초)</p>
+                    <div className="flex justify-center items-center mb-2">
+                      <div className="animate-bounce mr-1">🤖</div>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mx-2"></div>
+                      <div className="animate-pulse">✨</div>
+                    </div>
+                    <p className="text-sm text-gray-600">{loadingMessage.main}</p>
                     <div className="mt-2 text-xs text-gray-500">
-                      매너 체크와 번역을 동시에 처리하고 있어요
+                      {loadingMessage.sub}
                     </div>
                   </div>
                 ) : (
                   <>
                     <div className="flex justify-between items-start">
-                      <p className="font-medium">{t('originalMessage')}: {message.text}</p>
+                      <p className="font-medium">{message.text}</p>
                       <span className="text-xs text-gray-500 ml-2">
                         {message.userId === userId ? 'You' : 'Friend'}
                       </span>
@@ -397,10 +477,7 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
               </div>
               {message.feedback && (
                 <EnhancedMannerFeedback 
-                  feedback={{
-                    ...message.feedback,
-                    confidence: message.feedback.confidence || 0.8
-                  }} 
+                  feedback={message.feedback} 
                   language={language} 
                 />
               )}

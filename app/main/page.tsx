@@ -8,7 +8,7 @@ import Cookies from 'js-cookie'
 import ChatInterface from '../components/ChatInterface'
 import ChatList from '../components/ChatList'
 import CountrySelector from '../components/CountrySelector'
-import LanguageSelector from '../components/LanguageSelector'
+
 import TranslateMode from '../components/TranslateMode'
 import ProfileSetupModal from '../components/ProfileSetupModal'
 import { Language, getTranslation } from '../lib/i18n'
@@ -74,8 +74,9 @@ export default function MainPage() {
       const data = await response.json()
       if (data.success) {
         setUserProfile(data.profile)
-        // 새로 설정한 언어로 업데이트
+        // 새로 설정한 언어와 국적으로 업데이트
         setSelectedLanguage(language)
+        setSelectedCountry(nationality)
         setShowProfileModal(false)
       }
     } catch (error) {
@@ -104,7 +105,12 @@ export default function MainPage() {
       const clientId = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID
       const logoutUri = process.env.NEXT_PUBLIC_LOGOUT_URI
       const cognitoDomain = process.env.NEXT_PUBLIC_COGNITO_DOMAIN
-      window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`
+      
+      if (clientId && logoutUri && cognitoDomain) {
+        window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`
+      } else {
+        router.push('/login')
+      }
     } catch (error) {
       console.error('로그아웃 오류:', error)
       // 오류가 발생해도 로그인 페이지로 이동
@@ -112,34 +118,7 @@ export default function MainPage() {
     }
   }
 
-  // 언어 변경 시 DB 업데이트
-  const handleLanguageChange = async (newLanguage: Language) => {
-    setSelectedLanguage(newLanguage)
-    
-    // 사용자 프로필이 있으면 DB에 업데이트
-    if (userProfile && auth.user) {
-      try {
-        const userId = auth.user.profile.sub
-        const email = auth.user.profile.email
-        
-        await fetch('/api/user-profile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            userId, 
-            email, 
-            nationality: userProfile.nationality, 
-            language: newLanguage 
-          })
-        })
-        
-        // 로컬 상태도 업데이트
-        setUserProfile({ ...userProfile, language: newLanguage })
-      } catch (error) {
-        console.error('언어 설정 업데이트 오류:', error)
-      }
-    }
-  }
+
 
   const t = (key: keyof typeof import('../lib/i18n').translations.ko) => 
     getTranslation(selectedLanguage, key)
@@ -170,7 +149,7 @@ export default function MainPage() {
             {t('subtitle')}
           </p>
           
-          {/* 로그아웃 버튼 */}
+          {/* 사용자 메뉴 */}
           <div className="absolute top-0 right-0 flex items-center gap-4">
             <span className="text-sm text-gray-600">
               {selectedLanguage === 'ko' ? '안녕하세요' : 
@@ -185,21 +164,41 @@ export default function MainPage() {
                selectedLanguage === 'pt' ? 'Olá' : '안녕하세요'}, {auth.user?.profile.email}!
             </span>
             <button
+              onClick={() => setShowProfileModal(true)}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
+            >
+              <span>⚙️</span>
+              {selectedLanguage === 'ko' ? '설정' : 
+               selectedLanguage === 'en' ? 'Settings' :
+               selectedLanguage === 'ja' ? '設定' :
+               selectedLanguage === 'zh' ? '设置' :
+               selectedLanguage === 'de' ? 'Einstellungen' :
+               selectedLanguage === 'fr' ? 'Paramètres' :
+               selectedLanguage === 'it' ? 'Impostazioni' :
+               selectedLanguage === 'ru' ? 'Настройки' :
+               selectedLanguage === 'hi' ? 'सेटिंग्स' :
+               selectedLanguage === 'pt' ? 'Configurações' : '설정'}
+            </button>
+            <button
               onClick={handleLogout}
               className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
             >
               <span>🚪</span>
-              로그아웃
+              {selectedLanguage === 'ko' ? '로그아웃' : 
+               selectedLanguage === 'en' ? 'Logout' :
+               selectedLanguage === 'ja' ? 'ログアウト' :
+               selectedLanguage === 'zh' ? '登出' :
+               selectedLanguage === 'de' ? 'Abmelden' :
+               selectedLanguage === 'fr' ? 'Déconnexion' :
+               selectedLanguage === 'it' ? 'Disconnetti' :
+               selectedLanguage === 'ru' ? 'Выйти' :
+               selectedLanguage === 'hi' ? 'लॉगआउट' :
+               selectedLanguage === 'pt' ? 'Sair' : '로그아웃'}
             </button>
           </div>
         </header>
         
         <div className="max-w-6xl mx-auto">
-          <LanguageSelector 
-            selectedLanguage={selectedLanguage}
-            onLanguageChange={handleLanguageChange}
-          />
-          
           <div className="mb-6 p-4 bg-white rounded-lg shadow">
             <h3 className="text-lg font-semibold mb-3">{t('modeSelection')}</h3>
             <div className="flex gap-4">
@@ -282,6 +281,7 @@ export default function MainPage() {
         isOpen={showProfileModal}
         onComplete={handleProfileComplete}
         defaultLanguage={selectedLanguage}
+        currentProfile={userProfile}
       />
     </main>
   )

@@ -1,25 +1,33 @@
 'use client'
 
-import { useState } from 'react'
-import ChatInterface from './components/ChatInterface'
-import ChatList from './components/ChatList'
-import CountrySelector from './components/CountrySelector'
-import LanguageSelector from './components/LanguageSelector'
-import TranslateMode from './components/TranslateMode'
-import { Language, getTranslation } from './lib/i18n'
-import { Chat } from '../types/chat'
-
-type Mode = 'chat' | 'translate'
+import { useAuth } from "react-oidc-context"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
+import Cookies from 'js-cookie'
 
 export default function Home() {
-  const [selectedCountry, setSelectedCountry] = useState('KR')
-  const [selectedLanguage, setSelectedLanguage] = useState<Language>('ko')
-  const [mode, setMode] = useState<Mode>('chat')
-  const [selectedChat, setSelectedChat] = useState<Chat | null>(null)
-  const [userId] = useState(`user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
+  const auth = useAuth()
+  const router = useRouter()
 
-  const t = (key: keyof typeof import('./lib/i18n').translations.ko) => 
-    getTranslation(selectedLanguage, key)
+  useEffect(() => {
+    // URL에 code 파라미터가 있으면 콜백 처리 중
+    const urlParams = new URLSearchParams(window.location.search)
+    const hasCode = urlParams.get('code')
+    
+    if (!auth.isLoading) {
+      if (auth.isAuthenticated) {
+        router.push('/main')
+      } else if (!hasCode) {
+        // 로그인되지 않은 상태에서 쿠키 정리
+        const authCookies = ['oidc.user', 'oidc.access_token', 'oidc.id_token', 'oidc.refresh_token']
+        authCookies.forEach(cookieName => {
+          Cookies.remove(cookieName)
+          Cookies.remove(cookieName, { path: '/' })
+        })
+        router.push('/login')
+      }
+    }
+  }, [auth.isLoading, auth.isAuthenticated, router])
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -104,6 +112,6 @@ export default function Home() {
           )}
         </div>
       </div>
-    </main>
+    </div>
   )
 }

@@ -15,6 +15,7 @@ interface ChatInterfaceProps {
 
 interface Alternative {
   text: string
+  translatedText: string
   reason: string
   formalityLevel: 'formal' | 'semi-formal' | 'casual'
 }
@@ -88,8 +89,8 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
     setCurrentInput('')
 
     try {
-      // 관계별 매너 체크 + 대안 제시
-      const response = await fetch('/api/analyze-with-alternatives', {
+      // 🚀 빠른 매너 체크 + 번역 (병렬 처리)
+      const response = await fetch('/api/fast-analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -108,18 +109,24 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
       
       const result = await response.json()
       
-      // 분석 완료된 메시지로 업데이트
+      // 분석 완료된 메시지로 업데이트 (번역 결과 포함)
       setMessages(prev => 
         prev.map(msg => 
           msg.id === newMessage.id 
             ? { 
                 ...msg, 
                 isAnalyzing: false,
+                translatedText: result.basicTranslation,
                 feedback: result
               }
             : msg
         )
       )
+      
+      // 히스토리에 추가 (번역 결과 있으면)
+      if (result.basicTranslation) {
+        addToHistory(text, result.basicTranslation, targetCountry)
+      }
       
       // 대안이 있으면 대안 선택 모달 표시
       if (result.type === 'warning' && result.alternatives) {
@@ -164,47 +171,28 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
     setMessages(prev => prev.filter(msg => msg.id !== messageId))
   }
 
-  const handleAlternativeSelect = async (selectedText: string) => {
+  const handleAlternativeSelect = async (selectedText: string, translatedText: string) => {
     if (!showAlternatives) return
     
-    // 선택된 대안으로 메시지 업데이트
+    // 선택된 대안으로 메시지 업데이트 (이미 번역된 텍스트 사용)
     setMessages(prev => 
       prev.map(msg => 
         msg.id === showAlternatives.messageId 
-          ? { ...msg, text: selectedText, feedback: { type: 'good', message: '👍 매너 굿! 선택한 표현이 적절합니다.' } }
+          ? { 
+              ...msg, 
+              text: selectedText, 
+              translatedText: translatedText,
+              feedback: { 
+                type: 'good', 
+                message: '👍 매너 굿! 선택한 표현이 적절합니다.' 
+              } 
+            }
           : msg
       )
     )
     
-    // 번역 진행
-    try {
-      const response = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: selectedText,
-          targetLanguage: '',
-          sourceLanguage: 'auto',
-          targetCountry
-        })
-      })
-      
-      const result = await response.json()
-      
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === showAlternatives.messageId 
-            ? { ...msg, translatedText: result.translatedText }
-            : msg
-        )
-      )
-      
-      if (result.translatedText) {
-        addToHistory(selectedText, result.translatedText, targetCountry)
-      }
-    } catch (error) {
-      console.error('Translation failed:', error)
-    }
+    // 히스토리에 추가
+    addToHistory(selectedText, translatedText, targetCountry)
     
     setShowAlternatives(null)
   }
@@ -290,7 +278,10 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
               {message.isAnalyzing ? (
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                  <p className="text-sm text-gray-600">{t('analyzingMessage')}</p>
+                  <p className="text-sm text-gray-600">🚀 빠른 분석 중... (2-3초)</p>
+                  <div className="mt-2 text-xs text-gray-500">
+                    매너 체크와 번역을 동시에 처리하고 있어요
+                  </div>
                 </div>
               ) : (
                 <>
@@ -356,6 +347,7 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
         <AlternativeSelector
           alternatives={showAlternatives.alternatives}
           originalMessage={showAlternatives.originalMessage}
+          targetCountry={targetCountry}
           onSelect={handleAlternativeSelect}
           onCancel={handleAlternativeCancel}
         />

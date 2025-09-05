@@ -22,7 +22,8 @@ describe('ChatInterface', () => {
       ok: true,
       json: async () => ({
         type: 'good',
-        message: '👍 매너 굿! 문화적으로 적절한 표현이에요'
+        message: '👍 매너 굿! 문화적으로 적절한 표현이에요',
+        basicTranslation: 'Hello, how are you?'
       })
     }
 
@@ -37,14 +38,14 @@ describe('ChatInterface', () => {
     fireEvent.click(sendButton)
 
     await waitFor(() => {
-      expect(screen.getByText('Hello, how are you?')).toBeInTheDocument()
+      expect(screen.getAllByText(/Hello, how are you?/)).toHaveLength(2) // 원문과 번역문
     })
 
     await waitFor(() => {
       expect(screen.getByText('👍 매너 굿! 문화적으로 적절한 표현이에요')).toBeInTheDocument()
     })
 
-    expect(fetch).toHaveBeenCalledWith('/api/analyze', expect.objectContaining({
+    expect(fetch).toHaveBeenCalledWith('/api/fast-analyze', expect.objectContaining({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -52,6 +53,7 @@ describe('ChatInterface', () => {
       body: JSON.stringify({
         message: 'Hello, how are you?',
         targetCountry: 'US',
+        relationship: 'friend',
         language: 'ko',
       }),
     }))
@@ -69,18 +71,19 @@ describe('ChatInterface', () => {
     fireEvent.click(sendButton)
 
     await waitFor(() => {
-      expect(screen.getByText('Test message')).toBeInTheDocument()
+      expect(screen.getByText(/Test message/)).toBeInTheDocument()
     })
 
     await waitFor(() => {
-      expect(screen.getByText(/👍 매너 굿!/)).toBeInTheDocument()
+      expect(screen.getByText(/분석 중 오류가 발생했습니다/)).toBeInTheDocument()
     })
   })
 
   test('displays message timestamp', async () => {
     const mockResponse = {
       type: 'good',
-      message: '좋은 메시지입니다'
+      message: '좋은 메시지입니다',
+      basicTranslation: 'Test message'
     }
 
     ;(fetch as jest.Mock).mockResolvedValueOnce({
@@ -96,7 +99,7 @@ describe('ChatInterface', () => {
     fireEvent.click(sendButton)
 
     await waitFor(() => {
-      expect(screen.getByText('Test message')).toBeInTheDocument()
+      expect(screen.getByText(/Test message/)).toBeInTheDocument()
     })
 
     // 타임스탬프가 표시되는지 확인 (정확한 시간은 확인하지 않고 형식만 확인)

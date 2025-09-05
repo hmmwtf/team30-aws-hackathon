@@ -20,6 +20,7 @@ interface AlternativeAnalysisRequest {
 
 interface Alternative {
   text: string
+  translatedText: string
   reason: string
   formalityLevel: 'formal' | 'semi-formal' | 'casual'
 }
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     const relationInfo = relationshipContext[relationship]
 
-    const prompt = `당신은 문화적 매너 전문가입니다. 다음 메시지를 ${countryName} 문화권에서 ${relationInfo.ko}에게 보내는 것으로 분석해주세요.
+    const prompt = `당신은 한국인 사용자를 위한 문화적 매너 전문가입니다. 한국인이 ${countryName} 문화권의 ${relationInfo.ko}에게 보내는 메시지를 분석해주세요.
 
 메시지: "${message}"
 대상 국가: ${countryName}
@@ -85,23 +86,25 @@ ${targetCountry === 'KR' ?
   "culturalReason": "문화적 이유",
   "alternatives": [
     {
-      "text": "첫 번째 대안 (가장 격식있는 표현)",
+      "text": "첫 번째 대안 (한국어로 작성 - 가장 격식있는 표현)",
       "reason": "선택 이유",
       "formalityLevel": "formal"
     },
     {
-      "text": "두 번째 대안 (중간 격식 표현)",
+      "text": "두 번째 대안 (한국어로 작성 - 중간 격식 표현)",
       "reason": "선택 이유", 
       "formalityLevel": "semi-formal"
     },
     {
-      "text": "세 번째 대안 (친근한 표현)",
+      "text": "세 번째 대안 (한국어로 작성 - 친근한 표현)",
       "reason": "선택 이유",
       "formalityLevel": "casual"
     }
   ],
   "originalMessage": "${message}"
 }
+
+**중요**: 대안은 반드시 한국어로 작성해주세요. 번역은 별도로 처리됩니다.
 
 문제가 없는 경우:
 {
@@ -137,6 +140,42 @@ ${targetCountry === 'KR' ?
       if (jsonStart !== -1 && jsonEnd !== -1) {
         const jsonText = rawText.substring(jsonStart, jsonEnd + 1)
         result = JSON.parse(jsonText)
+        
+        // 대안이 있으면 번역 추가
+        if (result.alternatives && result.alternatives.length > 0) {
+          // 번역 API 직접 호출 대신 AWS Translate 사용
+          const { TranslateClient, TranslateTextCommand } = require('@aws-sdk/client-translate')
+          const translateClient = new TranslateClient({
+            region: process.env.AWS_REGION || 'us-east-1'
+          })
+          
+          const targetLanguageMap = {
+            KR: 'ko', US: 'en', JP: 'ja', CN: 'zh', 
+            GB: 'en', DE: 'de', FR: 'fr'
+          }
+          const targetLang = targetLanguageMap[targetCountry as keyof typeof targetLanguageMap] || 'en'
+          
+          result.alternatives = await Promise.all(
+            result.alternatives.map(async (alt) => {
+              try {
+                const translateCommand = new TranslateTextCommand({
+                  Text: alt.text,
+                  SourceLanguageCode: 'ko', // 한국어에서
+                  TargetLanguageCode: targetLang // 대상 언어로
+                })
+                
+                const translateResult = await translateClient.send(translateCommand)
+                return {
+                  ...alt,
+                  translatedText: translateResult.TranslatedText || alt.text
+                }
+              } catch (error) {
+                console.error('Translation failed for alternative:', error)
+                return { ...alt, translatedText: alt.text }
+              }
+            })
+          )
+        }
       } else {
         throw new Error('No valid JSON found')
       }

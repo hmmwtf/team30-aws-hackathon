@@ -4,11 +4,19 @@ import { useState, useEffect } from 'react'
 import MessageInput from './MessageInput'
 import MannerFeedback from './MannerFeedback'
 import TranslationHistory, { addToHistory } from './TranslationHistory'
+import RelationshipSelector from './RelationshipSelector'
+import AlternativeSelector from './AlternativeSelector'
 import { Language, getTranslation } from '../lib/i18n'
 
 interface ChatInterfaceProps {
   targetCountry: string
   language: Language
+}
+
+interface Alternative {
+  text: string
+  reason: string
+  formalityLevel: 'formal' | 'semi-formal' | 'casual'
 }
 
 interface Message {
@@ -21,6 +29,8 @@ interface Message {
     type: 'warning' | 'good'
     message: string
     suggestion?: string
+    alternatives?: Alternative[]
+    originalMessage?: string
   }
   translationFeedback?: {
     type: 'warning' | 'good'
@@ -39,6 +49,12 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
   const [currentInput, setCurrentInput] = useState('')
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [showCopyToast, setShowCopyToast] = useState(false)
+  const [selectedRelationship, setSelectedRelationship] = useState('friend')
+  const [showAlternatives, setShowAlternatives] = useState<{
+    messageId: string
+    alternatives: Alternative[]
+    originalMessage: string
+  } | null>(null)
 
   // 복사 기능
   const copyToClipboard = async (text: string, messageId: string) => {
@@ -72,18 +88,17 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
     setCurrentInput('')
 
     try {
-      // 번역 + 매너 체크 동시 진행
-      const response = await fetch('/api/translate-analyze', {
+      // 관계별 매너 체크 + 대안 제시
+      const response = await fetch('/api/analyze-with-alternatives', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          text,
-          targetLanguage: '', // 서버에서 대상 국가에 따라 결정
-          sourceLanguage: 'auto',
+          message: text,
           targetCountry,
-          userLanguage: language // 사용자 인터페이스 언어
+          relationship: selectedRelationship,
+          language
         })
       })
       
@@ -93,11 +108,6 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
       
       const result = await response.json()
       
-      // 히스토리에 추가
-      if (result.translatedText) {
-        addToHistory(text, result.translatedText, targetCountry)
-      }
-      
       // 분석 완료된 메시지로 업데이트
       setMessages(prev => 
         prev.map(msg => 
@@ -105,12 +115,20 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
             ? { 
                 ...msg, 
                 isAnalyzing: false,
-                translatedText: result.translatedText,
-                feedback: result.mannerFeedback
+                feedback: result
               }
             : msg
         )
       )
+      
+      // 대안이 있으면 대안 선택 모달 표시
+      if (result.type === 'warning' && result.alternatives) {
+        setShowAlternatives({
+          messageId: newMessage.id,
+          alternatives: result.alternatives,
+          originalMessage: result.originalMessage || text
+        })
+      }
       
     } catch (error) {
       console.error('Translation/Analysis failed:', error)
@@ -144,6 +162,55 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
 
   const handleCancelMessage = (messageId: string) => {
     setMessages(prev => prev.filter(msg => msg.id !== messageId))
+  }
+
+  const handleAlternativeSelect = async (selectedText: string) => {
+    if (!showAlternatives) return
+    
+    // 선택된 대안으로 메시지 업데이트
+    setMessages(prev => 
+      prev.map(msg => 
+        msg.id === showAlternatives.messageId 
+          ? { ...msg, text: selectedText, feedback: { type: 'good', message: '👍 매너 굿! 선택한 표현이 적절합니다.' } }
+          : msg
+      )
+    )
+    
+    // 번역 진행
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: selectedText,
+          targetLanguage: '',
+          sourceLanguage: 'auto',
+          targetCountry
+        })
+      })
+      
+      const result = await response.json()
+      
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === showAlternatives.messageId 
+            ? { ...msg, translatedText: result.translatedText }
+            : msg
+        )
+      )
+      
+      if (result.translatedText) {
+        addToHistory(selectedText, result.translatedText, targetCountry)
+      }
+    } catch (error) {
+      console.error('Translation failed:', error)
+    }
+    
+    setShowAlternatives(null)
+  }
+
+  const handleAlternativeCancel = () => {
+    setShowAlternatives(null)
   }
 
 
@@ -195,6 +262,13 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
       <div className="bg-blue-500 text-white p-4">
         <h2 className="text-xl font-semibold">{t('chatTitle')}</h2>
         <p className="text-blue-100">{t('chatSubtitle')}</p>
+      </div>
+      
+      <div className="p-4 border-b">
+        <RelationshipSelector 
+          selectedRelationship={selectedRelationship}
+          onRelationshipChange={setSelectedRelationship}
+        />
       </div>
       
       <div className="h-96 overflow-y-auto p-4 space-y-4">
@@ -275,6 +349,16 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-600 text-white px-4 py-2 rounded-lg shadow-lg z-50">
           복사 완료! 📋
         </div>
+      )}
+      
+      {/* 대안 선택 모달 */}
+      {showAlternatives && (
+        <AlternativeSelector
+          alternatives={showAlternatives.alternatives}
+          originalMessage={showAlternatives.originalMessage}
+          onSelect={handleAlternativeSelect}
+          onCancel={handleAlternativeCancel}
+        />
       )}
     </div>
   )

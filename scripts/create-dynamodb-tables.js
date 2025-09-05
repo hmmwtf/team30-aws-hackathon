@@ -59,6 +59,13 @@ async function main() {
     ]
   )
 
+  // Users 테이블
+  await createTable(
+    'Users',
+    [{ AttributeName: 'userId', KeyType: 'HASH' }],
+    [{ AttributeName: 'userId', AttributeType: 'S' }]
+  )
+
   console.log('DynamoDB tables setup complete!')
 }
 

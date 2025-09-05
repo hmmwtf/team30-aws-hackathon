@@ -76,7 +76,7 @@ describe('MessageInput', () => {
     const sendButton = screen.getByText('전송')
     expect(sendButton).toBeDisabled()
   })
-  test('shows analyzing state', () => {
+  test('shows analyzing state', async () => {
     // 분석 중 상태를 시뮬레이션하기 위해 mockOnSend를 Promise로 만듦
     mockOnSend.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)))
 
@@ -86,13 +86,16 @@ describe('MessageInput', () => {
         onChange={mockOnChange}
         onSend={mockOnSend}
         targetCountry="US"
+        language="ko"
       />
     )
 
     const sendButton = screen.getByText('전송')
     fireEvent.click(sendButton)
 
-    expect(screen.getByText('분석중...').toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('분석중...')).toBeInTheDocument()
+    })
   })
 
 })

@@ -53,7 +53,6 @@ export default function MessageInput({ value, onChange, onSend, targetCountry, l
           ) : (
             '전송'
           )}
-          {isAnalyzing ? t('analyzing') : t('sendButton')}
         </button>
       </div>
       <p className="text-xs text-gray-500 mt-2">

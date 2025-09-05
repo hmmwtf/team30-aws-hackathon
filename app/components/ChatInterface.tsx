@@ -91,12 +91,9 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
         } else if (error.message.includes('HTTP')) {
           errorMessage = '🌐 서버 오류가 발생했습니다. 기본 분석을 제공합니다.'
         }
+      }
 
       console.error('Analysis service unavailable')
-      newMessage.feedback = {
-        type: 'good',
-        message: t('mannerGood')
-      }
       
       setMessages(prev => 
         prev.map(msg => 
@@ -104,10 +101,9 @@ export default function ChatInterface({ targetCountry, language }: ChatInterface
             ? { 
                 ...msg, 
                 feedback: {
-                  type: 'good',
+                  type: 'good' as const,
                   message: errorMessage,
-                  suggestion: '잠시 후 다시 시도해주세요.',
-                  culturalReason: '오프라인 모드입니다.'
+                  suggestion: '잠시 후 다시 시도해주세요.'
                 }
               }
             : msg

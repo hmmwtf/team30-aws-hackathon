@@ -7,6 +7,7 @@ interface MannerFeedbackProps {
     type: 'warning' | 'good'
     message: string
     suggestion?: string
+    culturalReason?: string
   }
   language: Language
 }
@@ -32,7 +33,12 @@ export default function MannerFeedback({ feedback, language }: MannerFeedbackPro
           </p>
           {feedback.suggestion && (
             <p className="text-sm text-gray-600 mt-1">
-              💡 {feedback.suggestion}
+              💡 <strong>제안:</strong> {feedback.suggestion}
+            </p>
+          )}
+          {feedback.culturalReason && (
+            <p className="text-xs text-gray-500 mt-2 border-t pt-2">
+              🌍 <strong>문화적 배경:</strong> {feedback.culturalReason}
             </p>
           )}
         </div>

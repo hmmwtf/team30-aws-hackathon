@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Language, getTranslation } from '../lib/i18n'
+import { Language, getTranslation, languages } from '../lib/i18n'
+import useSTTService from '../services/STTService'
 
 interface MessageInputProps {
   value: string
@@ -13,6 +14,7 @@ interface MessageInputProps {
 
 export default function MessageInput({ value, onChange, onSend, targetCountry, language }: MessageInputProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const { startRecording, stopRecording, isRecording } = useSTTService(onChange, languages[language].stt_code)
 
   const t = (key: keyof typeof import('../lib/i18n').translations.ko) => 
     getTranslation(language, key)
@@ -40,6 +42,17 @@ export default function MessageInput({ value, onChange, onSend, targetCountry, l
           className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           disabled={isAnalyzing}
         />
+        <button
+          type="button"
+          onClick={isRecording ? stopRecording : startRecording}
+          className={`px-4 py-2 rounded-lg flex items-center justify-center min-w-[50px] ${
+            isRecording 
+              ? 'bg-red-500 hover:bg-red-600 text-white' 
+              : 'bg-gray-500 hover:bg-gray-600 text-white'
+          }`}
+        >
+          {isRecording ? '⏹️' : '🎤'}
+        </button>
         <button
           type="submit"
           disabled={!value.trim() || isAnalyzing}

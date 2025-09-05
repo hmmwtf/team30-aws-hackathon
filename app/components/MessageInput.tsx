@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Language, getTranslation } from '../lib/i18n'
+import { Language, getTranslation, languages } from '../lib/i18n'
 import useSTTService from '../services/STTService'
 
 interface MessageInputProps {
@@ -14,7 +14,7 @@ interface MessageInputProps {
 
 export default function MessageInput({ value, onChange, onSend, targetCountry, language }: MessageInputProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const { startRecording, stopRecording, isRecording } = useSTTService(onChange)
+  const { startRecording, stopRecording, isRecording } = useSTTService(onChange, languages[language].stt_code)
 
   const t = (key: keyof typeof import('../lib/i18n').translations.ko) => 
     getTranslation(language, key)
@@ -30,8 +30,6 @@ export default function MessageInput({ value, onChange, onSend, targetCountry, l
       setIsAnalyzing(false)
     }
   }
-
-  
 
   return (
     <form onSubmit={handleSubmit} className="border-t p-4">

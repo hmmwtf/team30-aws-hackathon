@@ -1,7 +1,7 @@
 
 import { useState } from "react"
 
-export default function useSTTService(onChange: (text: string) => void) {
+export default function useSTTService(onChange: (text: string) => void, languageCode: string = 'ko-KR') {
     const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
     const [isRecording, setIsRecording] = useState(false)
 
@@ -9,6 +9,7 @@ export default function useSTTService(onChange: (text: string) => void) {
         try {
             const formData = new FormData()
             formData.append('audio', audioBlob)
+            formData.append('languageCode', languageCode)
 
             const response = await fetch('/api/transcribe', {
                 method: 'POST',

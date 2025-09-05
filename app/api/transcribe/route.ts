@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const audioFile = formData.get('audio') as File
+    const languageCode = formData.get('languageCode') as string || 'ko-KR'
     
     if (!audioFile) {
       return NextResponse.json({ error: 'No audio file provided' }, { status: 400 })
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
         MediaFileUri: `s3://${bucketName}/${key}`
       },
       MediaFormat: 'webm',
-      LanguageCode: 'ko-KR'
+      LanguageCode: languageCode
     }))
 
     // 작업 완료 대기 (최대 30초)

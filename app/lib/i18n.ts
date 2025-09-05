@@ -1,16 +1,16 @@
 export type Language = 'ko' | 'en' | 'ja' | 'zh' | 'de' | 'fr' | 'it' | 'ru' | 'hi' | 'pt'
 
 export const languages = {
-  ko: { name: '한국어', flag: '🇰🇷' },
-  en: { name: 'English', flag: '🇺🇸' },
-  ja: { name: '日本語', flag: '🇯🇵' },
-  zh: { name: '中文', flag: '🇨🇳' },
-  de: { name: 'Deutsch', flag: '🇩🇪' },
-  fr: { name: 'Français', flag: '🇫🇷' },
-  it: { name: 'Italiano', flag: '🇮🇹' },
-  ru: { name: 'Русский', flag: '🇷🇺' },
-  hi: { name: 'हिन्दी', flag: '🇮🇳' },
-  pt: { name: 'Português', flag: '🇧🇷' },
+  ko: { name: '한국어', flag: '🇰🇷', stt_code: 'ko-KR'},
+  en: { name: 'English', flag: '🇺🇸', stt_code: 'en-US'},
+  ja: { name: '日本語', flag: '🇯🇵', stt_code: 'ja-JP'},
+  zh: { name: '中文', flag: '🇨🇳', stt_code: 'zh-CN'},
+  de: { name: 'Deutsch', flag: '🇩🇪', stt_code: 'de-DE'},
+  fr: { name: 'Français', flag: '🇫🇷', stt_code: 'fr-FR'},
+  it: { name: 'Italiano', flag: '🇮🇹', stt_code: 'it-IT'},
+  ru: { name: 'Русский', flag: '🇷🇺', stt_code: 'ru-RU'},
+  hi: { name: 'हिन्दी', flag: '🇮🇳', stt_code: 'hi-IN'},
+  pt: { name: 'Português', flag: '🇧🇷', stt_code: 'pt-BR'},
 }
 
 export const translations = {

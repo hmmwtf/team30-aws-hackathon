@@ -1,8 +1,17 @@
-import './globals.css'
+'use client'
 
-export const metadata = {
-  title: 'CultureChat - 매너있는 외국인 채팅',
-  description: '문화적 배려가 담긴 글로벌 채팅 서비스',
+import './globals.css'
+import { AuthProvider } from "react-oidc-context"
+
+const cognitoAuthConfig = {
+  authority: "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_thz0ABVLv",
+  client_id: "49rviner30oomvrdo0l4t82d2p",
+  redirect_uri: "http://localhost:3000",
+  response_type: "code",
+  scope: "email openid phone",
+  automaticSilentRenew: true,
+  includeIdTokenInSilentRenew: true,
+  post_logout_redirect_uri: "http://localhost:3000/login",
 }
 
 export default function RootLayout({
@@ -12,7 +21,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body>
+        <AuthProvider {...cognitoAuthConfig}>
+          {children}
+        </AuthProvider>
+      </body>
     </html>
   )
 }

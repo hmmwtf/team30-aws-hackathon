@@ -12,6 +12,12 @@ const countries = [
   { code: 'GB', name: '영국', flag: '🇬🇧' },
   { code: 'DE', name: '독일', flag: '🇩🇪' },
   { code: 'FR', name: '프랑스', flag: '🇫🇷' },
+  { code: 'KR', name: '한국', flag: '🇰🇷' },
+  { code: 'IT', name: '이탈리아', flag: '🇮🇹' },
+  { code: 'RU', name: '러시아', flag: '🇷🇺' },
+  { code: 'IN', name: '인도', flag: '🇮🇳' },
+  { code: 'BR', name: '브라질', flag: '🇧🇷' },
+  { code: 'AU', name: '호주', flag: '🇦🇺' },
 ]
 
 export default function CountrySelector({ selectedCountry, onCountryChange }: CountrySelectorProps) {

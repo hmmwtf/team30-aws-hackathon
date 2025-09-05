@@ -14,11 +14,14 @@ export default function MessageInput({ value, onChange, onSend, targetCountry }:
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!value.trim()) return
+    if (!value.trim() || isAnalyzing) return
 
     setIsAnalyzing(true)
-    await onSend(value)
-    setIsAnalyzing(false)
+    try {
+      await onSend(value)
+    } finally {
+      setIsAnalyzing(false)
+    }
   }
 
   return (
@@ -35,9 +38,16 @@ export default function MessageInput({ value, onChange, onSend, targetCountry }:
         <button
           type="submit"
           disabled={!value.trim() || isAnalyzing}
-          className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 min-w-[80px] justify-center"
         >
-          {isAnalyzing ? '분석중...' : '전송'}
+          {isAnalyzing ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              분석중
+            </>
+          ) : (
+            '전송'
+          )}
         </button>
       </div>
       <p className="text-xs text-gray-500 mt-2">

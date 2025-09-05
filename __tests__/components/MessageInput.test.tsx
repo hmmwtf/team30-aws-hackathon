@@ -90,6 +90,6 @@ describe('MessageInput', () => {
     const sendButton = screen.getByText('전송')
     fireEvent.click(sendButton)
 
-    expect(screen.getByText('분석중...')).toBeInTheDocument()
+    expect(screen.getByText('분석중')).toBeInTheDocument()
   })
 })

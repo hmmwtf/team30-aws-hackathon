@@ -1,57 +1,39 @@
-// 간단한 메모리 캐시로 중복 요청 방지
-interface CacheEntry {
-  result: any
-  timestamp: number
-}
-
+// 간단한 메모리 캐시 구현
 class SimpleCache {
-  private cache = new Map<string, CacheEntry>()
-  private maxAge = 5 * 60 * 1000 // 5분
-  private maxSize = 100
+  private cache = new Map<string, { data: any; timestamp: number; ttl: number }>()
 
-  generateKey(message: string, country: string): string {
-    return `${country}:${message.toLowerCase().trim()}`
+  set(key: string, data: any, ttlMs: number = 300000) { // 기본 5분
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+      ttl: ttlMs
+    })
   }
 
   get(key: string): any | null {
-    const entry = this.cache.get(key)
-    if (!entry) return null
+    const item = this.cache.get(key)
+    if (!item) return null
 
-    // 만료된 캐시 삭제
-    if (Date.now() - entry.timestamp > this.maxAge) {
+    if (Date.now() - item.timestamp > item.ttl) {
       this.cache.delete(key)
       return null
     }
 
-    return entry.result
+    return item.data
   }
 
-  set(key: string, result: any): void {
-    // 캐시 크기 제한
-    if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value
-      if (firstKey) {
-        this.cache.delete(firstKey)
-      }
-    }
-
-    this.cache.set(key, {
-      result,
-      timestamp: Date.now()
-    })
-  }
-
-  clear(): void {
+  clear() {
     this.cache.clear()
   }
 
-  getStats() {
-    return {
-      size: this.cache.size,
-      maxSize: this.maxSize,
-      maxAge: this.maxAge
-    }
+  size() {
+    return this.cache.size
   }
 }
 
 export const analysisCache = new SimpleCache()
+
+// 캐시 키 생성 함수
+export function createCacheKey(message: string, targetCountry: string, relationship: string): string {
+  return `${message.toLowerCase().trim()}_${targetCountry}_${relationship}`
+}

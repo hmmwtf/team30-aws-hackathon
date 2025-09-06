@@ -10,9 +10,10 @@ interface EnhancedMannerFeedbackProps {
     confidence?: number
   }
   language: Language
+  showConfidence?: boolean
 }
 
-export default function EnhancedMannerFeedback({ feedback, language }: EnhancedMannerFeedbackProps) {
+export default function EnhancedMannerFeedback({ feedback, language, showConfidence = true }: EnhancedMannerFeedbackProps) {
   const t = (key: keyof typeof import('../lib/i18n').translations.ko) => 
     getTranslation(language, key)
 
@@ -41,7 +42,8 @@ export default function EnhancedMannerFeedback({ feedback, language }: EnhancedM
               {feedback.suggestion}
             </p>
           )}
-          {feedback.confidence && (
+
+          {showConfidence && feedback.confidence && (
             <div className="mt-2">
               <div className="text-xs text-gray-600 mb-1">
                 신뢰도: {Math.round(feedback.confidence * 100)}%

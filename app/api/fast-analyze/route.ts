@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime'
+import { analysisCache, createCacheKey } from '../../utils/cache'
 
 const client = new BedrockRuntimeClient({
   region: process.env.AWS_REGION || 'us-east-1',
@@ -13,6 +14,14 @@ export async function POST(request: NextRequest) {
   try {
     const { message, targetCountry, relationship, language } = await request.json()
     console.log('🔍 fast-analyze API - Received:', { message, targetCountry, relationship, language })
+    
+    // 캐시 확인
+    const cacheKey = `fast_${createCacheKey(message, targetCountry, relationship)}`
+    const cachedResult = analysisCache.get(cacheKey)
+    if (cachedResult) {
+      console.log('🚀 Cache hit for fast-analyze')
+      return NextResponse.json(cachedResult)
+    }
 
     // 국가 코드를 언어로 매핑
     const getTargetLanguage = (countryCode: string) => {
@@ -107,6 +116,9 @@ warning인 경우 3개의 대안을 제시해주세요.`
       }
     }
 
+    // 결과를 캐시에 저장 (3분)
+    analysisCache.set(cacheKey, result, 180000)
+    
     return NextResponse.json(result)
   } catch (error) {
     console.error('Fast analyze error:', error)

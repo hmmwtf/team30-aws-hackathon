@@ -1,7 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSSENotifications } from '../hooks/useSSENotifications'
+import { 
+  checkNotificationSupport, 
+  requestNotificationPermission, 
+  showNotification,
+  getNotificationInstructions 
+} from '../utils/notificationUtils'
 
 interface NotificationCenterProps {
   userId: string
@@ -10,6 +16,8 @@ interface NotificationCenterProps {
 
 export default function NotificationCenter({ userId, onNewMessage }: NotificationCenterProps) {
   const [showNotifications, setShowNotifications] = useState(false)
+  const [notificationSupport, setNotificationSupport] = useState(checkNotificationSupport())
+  const [permissionStatus, setPermissionStatus] = useState<string>('')
   
   const { isConnected, notifications, removeNotification, clearNotifications } = useSSENotifications({
     userId,
@@ -18,23 +26,46 @@ export default function NotificationCenter({ userId, onNewMessage }: Notificatio
       if (data.type === 'new_message' && data.message && onNewMessage) {
         onNewMessage(data)
         
-        // 브라우저 알림 표시
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification('새 메시지', {
-            body: `${data.senderName || '상대방'}님이 메시지를 보냈습니다.`,
-            icon: '/favicon.ico',
-            tag: 'new-message' // 중복 알림 방지
-          })
+        // 개선된 브라우저 알림 표시
+        const success = showNotification('새 메시지', {
+          body: `${data.senderName || '상대방'}님이 메시지를 보냈습니다.`,
+          tag: 'new-message'
+        })
+        
+        if (!success) {
+          console.log('Browser notification failed, using fallback')
         }
       }
     }
   })
 
-  // 브라우저 알림 권한 요청
-  const requestNotificationPermission = async () => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      await Notification.requestPermission()
+  useEffect(() => {
+    // 알림 지원 상태 주기적 체크
+    const interval = setInterval(() => {
+      const newSupport = checkNotificationSupport()
+      if (newSupport.permission !== notificationSupport.permission) {
+        setNotificationSupport(newSupport)
+      }
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [notificationSupport.permission])
+
+  // 개선된 브라우저 알림 권한 요청
+  const handleRequestPermission = async () => {
+    setPermissionStatus('요청 중...')
+    
+    const result = await requestNotificationPermission()
+    
+    if (result.success) {
+      setPermissionStatus('알림이 허용되었습니다!')
+      setNotificationSupport(checkNotificationSupport())
+    } else {
+      setPermissionStatus(result.error || '알림 허용 실패')
     }
+    
+    // 3초 후 상태 메시지 제거
+    setTimeout(() => setPermissionStatus(''), 3000)
   }
 
   const unreadCount = notifications.filter(n => n.type === 'new_message' && n.message).length
@@ -64,21 +95,53 @@ export default function NotificationCenter({ userId, onNewMessage }: Notificatio
       {/* 알림 패널 */}
       {showNotifications && (
         <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-          <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-            <h3 className="font-semibold">알림</h3>
-            <div className="flex gap-2">
-              <button
-                onClick={requestNotificationPermission}
-                className="text-sm text-blue-600 hover:text-blue-800"
-              >
-                알림 허용
-              </button>
-              <button
-                onClick={clearNotifications}
-                className="text-sm text-gray-600 hover:text-gray-800"
-              >
-                모두 지우기
-              </button>
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="font-semibold">알림</h3>
+              <div className="flex gap-2">
+                {notificationSupport.permission !== 'granted' && (
+                  <button
+                    onClick={handleRequestPermission}
+                    className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                    disabled={!notificationSupport.isSupported || permissionStatus === '요청 중...'}
+                  >
+                    알림 허용
+                  </button>
+                )}
+                <button
+                  onClick={clearNotifications}
+                  className="text-sm text-gray-600 hover:text-gray-800"
+                >
+                  모두 지우기
+                </button>
+              </div>
+            </div>
+            
+            {/* 알림 상태 표시 */}
+            <div className="text-xs text-gray-500">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${
+                  notificationSupport.permission === 'granted' ? 'bg-green-500' :
+                  notificationSupport.permission === 'denied' ? 'bg-red-500' :
+                  'bg-yellow-500'
+                }`} />
+                <span>
+                  {notificationSupport.permission === 'granted' ? '알림 허용됨' :
+                   notificationSupport.permission === 'denied' ? '알림 차단됨' :
+                   notificationSupport.isSupported ? '알림 권한 필요' : '알림 미지원'}
+                  {notificationSupport.browser && ` (${notificationSupport.browser})`}
+                </span>
+              </div>
+              
+              {permissionStatus && (
+                <div className="mt-1 text-blue-600">{permissionStatus}</div>
+              )}
+              
+              {notificationSupport.permission === 'denied' && (
+                <div className="mt-1 text-red-600">
+                  {getNotificationInstructions(notificationSupport.browser)}
+                </div>
+              )}
             </div>
           </div>
           

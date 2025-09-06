@@ -11,10 +11,11 @@ import CountrySelector from '../components/CountrySelector'
 
 import TranslateMode from '../components/TranslateMode'
 import ProfileSetupModal from '../components/ProfileSetupModal'
+import NotificationTest from '../components/NotificationTest'
 import { Language, getTranslation } from '../lib/i18n'
 import { Chat } from '../../types/chat'
 
-type Mode = 'chat' | 'translate'
+type Mode = 'chat' | 'translate' | 'test'
 
 export default function MainPage() {
   const auth = useAuth()
@@ -222,6 +223,16 @@ export default function MainPage() {
               >
                 {t('translateMode')}
               </button>
+              <button
+                onClick={() => setMode('test' as Mode)}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  mode === 'test'
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                🔔 알림 테스트
+              </button>
             </div>
           </div>
 
@@ -261,7 +272,7 @@ export default function MainPage() {
                 )}
               </div>
             </div>
-          ) : (
+          ) : mode === 'translate' ? (
             <div>
               <CountrySelector 
                 selectedCountry={selectedCountry}
@@ -273,6 +284,8 @@ export default function MainPage() {
                 language={selectedLanguage}
               />
             </div>
+          ) : (
+            <NotificationTest />
           )}
         </div>
       </div>

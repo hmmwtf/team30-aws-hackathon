@@ -30,16 +30,12 @@ describe('/api/analyze', () => {
       send: mockSend
     }))
 
-    const request = new NextRequest('http://localhost:3000/api/analyze', {
-      method: 'POST',
-      body: JSON.stringify({
+    const request = {
+      json: async () => ({
         message: 'Hello, how are you?',
         targetCountry: 'US'
-      }),
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
+      })
+    } as NextRequest
 
     const response = await POST(request)
     const result = await response.json()
@@ -47,7 +43,6 @@ describe('/api/analyze', () => {
     expect(response.status).toBe(200)
     expect(result.type).toBe('good')
     expect(result.message).toBe('👍 매너 굿! 미국 문화권에서 적절한 표현입니다.')
-
   })
 
   test('handles Bedrock API error gracefully', async () => {
@@ -58,25 +53,19 @@ describe('/api/analyze', () => {
       send: mockSend
     }))
 
-    const request = new NextRequest('http://localhost:3000/api/analyze', {
-      method: 'POST',
-      body: JSON.stringify({
+    const request = {
+      json: async () => ({
         message: 'Test message',
         targetCountry: 'US'
-      }),
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
+      })
+    } as NextRequest
 
     const response = await POST(request)
     const result = await response.json()
 
     expect(response.status).toBe(200)
     expect(result.type).toBe('good')
-
     expect(result.message).toBe('👍 매너 굿! 미국 문화권에서 적절한 표현입니다.')
-
   })
 
   test('handles invalid JSON response from Bedrock', async () => {
@@ -93,24 +82,18 @@ describe('/api/analyze', () => {
       send: mockSend
     }))
 
-    const request = new NextRequest('http://localhost:3000/api/analyze', {
-      method: 'POST',
-      body: JSON.stringify({
+    const request = {
+      json: async () => ({
         message: 'Test message',
         targetCountry: 'US'
-      }),
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
+      })
+    } as NextRequest
 
     const response = await POST(request)
     const result = await response.json()
 
     expect(response.status).toBe(200)
     expect(result.type).toBe('good')
-
     expect(result.message).toBe('👍 매너 굿! 미국 문화권에서 적절한 표현입니다.')
-
   })
 })

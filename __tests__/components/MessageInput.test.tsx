@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import MessageInput from '../../app/components/MessageInput'
 
@@ -91,7 +91,10 @@ describe('MessageInput', () => {
     )
 
     const sendButton = screen.getByText('전송')
-    fireEvent.click(sendButton)
+    
+    await act(async () => {
+      fireEvent.click(sendButton)
+    })
 
     await waitFor(() => {
       expect(screen.getByText('분석중...')).toBeInTheDocument()

@@ -53,16 +53,49 @@ export async function POST(request: NextRequest) {
     const receiver = receiverResult.Items[0]
     const chatId = `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
+    // 기존 채팅방 중복 확인
+    console.log('기존 채팅방 중복 확인 시작')
+    const existingChatResult = await docClient.send(new ScanCommand({
+      TableName: 'CultureChat-Chats',
+      FilterExpression: 'contains(participants, :sender) AND contains(participants, :receiver)',
+      ExpressionAttributeValues: {
+        ':sender': senderEmail,
+        ':receiver': receiverEmail
+      }
+    }))
+    
+    if (existingChatResult.Items && existingChatResult.Items.length > 0) {
+      const existingChat = existingChatResult.Items[0]
+      console.log('기존 채팅방 발견:', existingChat.id)
+      return NextResponse.json({ 
+        success: true, 
+        chatId: existingChat.id,
+        message: `${receiverEmail}님과의 채팅방이 이미 존재합니다.`,
+        isExisting: true
+      })
+    }
+
     // 채팅방 생성
+    const relationshipLabels: { [key: string]: string } = {
+      'boss': '상사',
+      'colleague': '동료', 
+      'friend': '친구',
+      'lover': '연인',
+      'parent': '부모님',
+      'stranger': '낯선 사람'
+    }
+    
     const chatRoom = {
       id: chatId,
       participants: [senderEmail, receiverEmail],
       relationship,
       senderCountry: sender.nationality,
       receiverCountry: receiver.nationality,
+      senderLanguage: sender.language, // 발신자 언어 추가
+      receiverLanguage: receiver.language, // 수신자 언어 추가
       createdAt: new Date().toISOString(),
       status: 'accepted', // 일단 바로 수락된 상태로 설정
-      name: `${receiver.email}과의 채팅`,
+      name: `${receiverEmail} (${relationshipLabels[relationship] || relationship})`,
       country: receiver.nationality,
       lastMessage: '',
       timestamp: new Date().toISOString(),

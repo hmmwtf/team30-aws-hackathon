@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import MessageInput from './MessageInput'
 import EnhancedMannerFeedback from './EnhancedMannerFeedback'
-import TestNotification from './TestNotification'
-import RelationshipSelector from './RelationshipSelector'
+// import TestNotification from './TestNotification' // 제거
+// import RelationshipSelector from './RelationshipSelector' // 제거
 import AlternativeSelector from './AlternativeSelector'
 import { Language, getTranslation } from '../lib/i18n'
 import { Message } from '../../types/message'
@@ -16,6 +16,8 @@ interface ChatInterfaceProps {
   language: Language
   chatId?: string
   userId: string
+  receiverLanguage?: string // 수신자 언어 추가
+  relationship?: string // 채팅방에서 가져온 관계 정보
 }
 
 interface Alternative {
@@ -24,12 +26,12 @@ interface Alternative {
   formalityLevel: 'formal' | 'semi-formal' | 'casual'
 }
 
-export default function ChatInterface({ targetCountry, language, chatId, userId }: ChatInterfaceProps) {
+export default function ChatInterface({ targetCountry, language, chatId, userId, receiverLanguage, relationship = 'friend' }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [currentInput, setCurrentInput] = useState('')
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [showCopyToast, setShowCopyToast] = useState(false)
-  const [selectedRelationship, setSelectedRelationship] = useState('friend')
+  // const [selectedRelationship, setSelectedRelationship] = useState('friend') // 제거 - 채팅방에서 가져옴
   const [showAlternatives, setShowAlternatives] = useState<{
     messageId: string
     alternatives: Alternative[]
@@ -70,8 +72,9 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
           id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           chatId: chatId,
           userId: data.userId,
-          text: data.message,
-          timestamp: data.timestamp
+          text: data.message, // 이미 번역된 메시지
+          timestamp: data.timestamp,
+          isTranslated: true // 수신된 메시지는 번역된 상태
         }
         setMessages(prev => [...prev, newMessage])
         
@@ -140,7 +143,7 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
     getTranslation(language, key)
 
   const handleSendMessage = async (text: string) => {
-    console.log('🔍 ChatInterface - targetCountry:', targetCountry)
+    console.log('🔍 ChatInterface - chatId:', chatId)
     
     const newMessage: Message = {
       id: Date.now().toString(),
@@ -157,16 +160,17 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
     setCurrentInput('')
 
     try {
-      // 🚀 빠른 매너 체크 + 번역 (병렬 처리)
+      // 🚀 새로운 채팅 분석 API 사용
       const requestBody = {
         message: text,
-        targetCountry,
-        relationship: selectedRelationship,
-        language
+        chatId,
+        senderEmail: userId // userId가 실제로는 email임
       }
+      
+      console.log('🔗 [RELATIONSHIP]:', relationship) // 관계 정보 로그
       console.log('📤 Request body:', requestBody)
       
-      const response = await fetch('/api/hybrid-analyze', {
+      const response = await fetch('/api/chat-analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -186,10 +190,10 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
       
       const result = await response.json()
       console.log('📥 [API-SUCCESS]:', JSON.stringify({
-        type: result.type,
-        hasTranslation: !!result.basicTranslation,
-        hasAlternatives: !!result.alternatives,
-        alternativeCount: result.alternatives?.length || 0
+        type: result.senderView.type,
+        hasTranslation: !!result.senderView.translatedText,
+        hasAlternatives: !!result.senderView.alternatives,
+        alternativeCount: result.senderView.alternatives?.length || 0
       }, null, 2))
       
       // 분석 완료된 메시지로 업데이트 (번역 결과 포함)
@@ -199,10 +203,10 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
             ? { 
                 ...msg, 
                 isAnalyzing: false,
-                translatedText: result.basicTranslation,
-                feedback: result,
+                translatedText: result.senderView.translatedText,
+                feedback: result.senderView,
                 // 매너 체크 통과 시 자동 전송 준비
-                isPending: result.type === 'warning' // warning이면 대기, good면 자동 전송
+                isPending: result.senderView.type === 'warning' // warning이면 대기, good면 자동 전송
               }
             : msg
         )
@@ -211,12 +215,12 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
       console.log('📥 API Response result:', result)
       
       // 대안이 있으면 대안 선택 모달 표시
-      if (result.type === 'warning') {
-        if (result.alternatives) {
-          // hybrid-analyze에서 바로 대안 제공
+      if (result.senderView.type === 'warning') {
+        if (result.senderView.alternatives && result.senderView.alternatives.length > 0) {
+          // chat-analyze에서 바로 대안 제공
           setShowAlternatives({
             messageId: newMessage.id,
-            alternatives: result.alternatives,
+            alternatives: result.senderView.alternatives,
             originalMessage: text
           })
         } else {
@@ -239,10 +243,10 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
             console.error('Failed to get alternatives:', error)
           }
         }
-      } else if (result.type === 'good') {
+      } else if (result.senderView.type === 'good') {
         // 매너 체크 통과 시 자동으로 번역문 전송 및 DB 저장
         setTimeout(async () => {
-          const messageToSend = result.basicTranslation || text
+          const messageToSend = result.senderView.translatedText || text
           
           try {
             // 1. DB에 메시지 저장
@@ -259,7 +263,7 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
                 chatId,
                 text: messageToSend,
                 userId: userId,
-                feedback: result
+                feedback: result.senderView
               })
             })
             
@@ -485,36 +489,24 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
 
   return (
     <div className="h-full flex flex-col bg-white">
-      <div className="bg-blue-500 text-white p-4">
+      <div className="bg-blue-500 text-white p-3"> {/* padding 축소 */}
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-semibold">{t('chatTitle')}</h2>
-            <p className="text-blue-100">{t('chatSubtitle')}</p>
-            {onlineUsers.length > 0 && (
-              <p className="text-blue-200 text-sm mt-1">
-                온라인: {onlineUsers.length}명
-              </p>
-            )}
+            <h2 className="text-lg font-semibold">{t('chatTitle')}</h2> {/* 폰트 축소 */}
+            <p className="text-blue-100 text-sm">{t('chatSubtitle')}</p> {/* 폰트 축소 */}
           </div>
-          <div className="flex items-center gap-4">
-            {/* WebSocket으로 알림 처리 */}
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}></div>
-              <span className="text-sm">{isConnected ? '연결됨' : '연결 끊어짐'}</span>
+          <div className="flex items-center gap-2"> {/* gap 축소 */}
+            <div className="flex items-center gap-1"> {/* gap 축소 */}
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}></div> {/* 크기 축소 */}
+              <span className="text-xs">{isConnected ? '연결됨' : '연결 끊어짐'}</span> {/* 폰트 축소 */}
             </div>
           </div>
         </div>
       </div>
       
-      <div className="p-4 border-b space-y-3">
-        <RelationshipSelector 
-          selectedRelationship={selectedRelationship}
-          onRelationshipChange={setSelectedRelationship}
-        />
-        <TestNotification userId={userId} chatId={chatId} wsRef={wsRef} />
-      </div>
+      {/* 불필요한 UI 요소 제거 - 채팅창 확대를 위해 */}
       
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-3 space-y-3"> {/* padding과 spacing 축소 */}
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-500">
             <div className="text-center">
@@ -556,17 +548,26 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
                 ) : (
                   <>
                     <div className="flex justify-between items-start">
-                      <p className="font-medium">{message.text}</p>
+                      <div className="flex-1">
+                        <p className="font-medium">{message.text}</p>
+                        {/* 발신자에게만 번역 결과 표시 */}
+                        {message.userId === userId && message.translatedText && message.translatedText !== message.text && (
+                          <div className="mt-2 p-2 bg-blue-50 rounded text-sm border-l-2 border-blue-300">
+                            <p className="text-blue-600 text-xs">🌍 상대방에게 전송된 메시지:</p>
+                            <p className="font-medium text-blue-800">{message.translatedText}</p>
+                          </div>
+                        )}
+                        {/* 수신자에게는 이미 번역된 메시지만 표시 */}
+                        {message.userId !== userId && message.isTranslated && (
+                          <div className="mt-1">
+                            <p className="text-xs text-gray-500">🌍 번역된 메시지</p>
+                          </div>
+                        )}
+                      </div>
                       <span className="text-xs text-gray-500 ml-2">
                         {message.userId === userId ? '나' : '상대방'}
                       </span>
                     </div>
-                    {message.translatedText && (
-                      <div className="mt-2 p-2 bg-white rounded text-sm">
-                        <p className="text-gray-600 text-xs">{t('translatedMessage')}:</p>
-                        <p className="font-medium">{message.translatedText}</p>
-                      </div>
-                    )}
                     {message.translation && (
                       <div className="mt-2 p-2 bg-white rounded text-sm">
                         <p className="text-gray-600 text-xs">{t('translatedMessage')}:</p>
@@ -599,7 +600,8 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
                   </>
                 )}
               </div>
-              {message.feedback && (
+              {/* 매너 체크 피드백은 발신자에게만 표시 */}
+              {message.feedback && message.userId === userId && (
                 <EnhancedMannerFeedback 
                   feedback={message.feedback} 
                   language={language} 
@@ -631,6 +633,8 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
           alternatives={showAlternatives.alternatives}
           originalMessage={showAlternatives.originalMessage}
           targetCountry={targetCountry}
+          userLanguage={language} // 사용자 언어 전달
+          receiverLanguage={receiverLanguage || 'en'} // 수신자 언어 동적 설정
           onSelect={handleAlternativeSelect}
           onCancel={handleAlternativeCancel}
         />

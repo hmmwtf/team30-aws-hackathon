@@ -13,6 +13,8 @@ interface AlternativeSelectorProps {
   alternatives: Alternative[]
   originalMessage: string
   targetCountry?: string
+  userLanguage?: string // 사용자 언어 추가
+  receiverLanguage?: string // 수신자 언어 추가
   onSelect: (selectedText: string, translatedText?: string) => void
   onCancel: () => void
 }
@@ -32,17 +34,21 @@ const formalityColors = {
 export default function AlternativeSelector({ 
   alternatives, 
   originalMessage,
-  targetCountry, 
+  targetCountry,
+  userLanguage = 'ko',
+  receiverLanguage = 'en', 
   onSelect, 
   onCancel 
 }: AlternativeSelectorProps) {
   
-  const countryNames = {
-    KR: '한국어', US: '영어', JP: '일본어', CN: '중국어',
-    GB: '영어', DE: '독일어', FR: '프랑스어', IN: '힌디어',
-    IT: '이탈리아어', RU: '러시아어', BR: '포르투갈어', AU: '영어'
+  const languageNames = {
+    ko: '한국어', en: '영어', ja: '일본어', zh: '중국어',
+    de: '독일어', fr: '프랑스어', hi: '힌디어',
+    it: '이탈리아어', ru: '러시아어', pt: '포르투갈어'
   }
-  const targetLanguage = countryNames[targetCountry as keyof typeof countryNames] || '번역문'
+  
+  const userLanguageName = languageNames[userLanguage as keyof typeof languageNames] || '내 언어'
+  const receiverLanguageName = languageNames[receiverLanguage as keyof typeof languageNames] || '상대방 언어'
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
 
   return (
@@ -94,18 +100,18 @@ export default function AlternativeSelector({
                       {alt.text === alt.translatedText ? (
                         // 같은 언어일 때 하나로 표시
                         <div className="p-2 bg-blue-50 rounded border">
-                          <p className="text-xs text-blue-600 mb-1">한국어</p>
+                          <p className="text-xs text-blue-600 mb-1">{userLanguageName}</p>
                           <p className="text-gray-900 font-medium">"{alt.text}"</p>
                         </div>
                       ) : (
                         // 다른 언어일 때 둘 다 표시
                         <>
                           <div className="p-2 bg-blue-50 rounded border">
-                            <p className="text-xs text-blue-600 mb-1">한국어 (내 언어)</p>
+                            <p className="text-xs text-blue-600 mb-1">{userLanguageName} (내 언어)</p>
                             <p className="text-gray-900 font-medium">"{alt.text}"</p>
                           </div>
                           <div className="p-2 bg-green-50 rounded border">
-                            <p className="text-xs text-green-600 mb-1">{targetLanguage} (상대방 언어)</p>
+                            <p className="text-xs text-green-600 mb-1">{receiverLanguageName} (상대방 언어)</p>
                             <p className="text-gray-900 font-medium">"{alt.translatedText}"</p>
                           </div>
                         </>

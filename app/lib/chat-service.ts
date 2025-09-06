@@ -31,6 +31,17 @@ export class ChatService {
     return (result.Items as Chat[]) || []
   }
 
+  static async getUserChats(userEmail: string): Promise<Chat[]> {
+    const result = await dynamodb.send(new ScanCommand({
+      TableName: 'CultureChat-Chats',
+      FilterExpression: 'contains(participants, :userEmail)',
+      ExpressionAttributeValues: {
+        ':userEmail': userEmail
+      }
+    }))
+    return (result.Items as Chat[]) || []
+  }
+
   static async saveMessage(message: Omit<Message, 'id' | 'timestamp'>): Promise<Message> {
     const timestamp = new Date().toISOString()
     const fullMessage: Message = {
@@ -54,8 +65,11 @@ export class ChatService {
       ExpressionAttributeValues: {
         ':chatId': chatId
       },
-      ScanIndexForward: true
+      ScanIndexForward: true // 오래된 메시지부터
     }))
-    return (result.Items as Message[]) || []
+    
+    const messages = (result.Items as Message[]) || []
+    // 시간순 정렬 확실히 하기
+    return messages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   }
 }

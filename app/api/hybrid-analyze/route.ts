@@ -55,6 +55,9 @@ export async function POST(request: NextRequest) {
       DE: 'German', FR: 'French', KR: 'Korean'
     }
     const targetLang = langMap[targetCountry] || 'English'
+    
+    // 같은 국가끼리는 번역하지 않음 (한국인끼리 채팅 시)
+    const needsTranslation = targetCountry !== 'KR'
 
     // 개선된 프롬프트 (피드백 + 대안 제시)
     const prompt = `You are a cultural communication expert. Analyze this Korean message for ${targetCountry} culture in a ${relationship} relationship context.
@@ -77,7 +80,7 @@ For APPROPRIATE messages:
 {
   "type": "good",
   "message": "👍 매너 굿! 문화적으로 적절한 표현입니다.",
-  "translation": "${targetLang} translation of the message",
+  ${needsTranslation ? `"translation": "${targetLang} translation of the message",` : ''}
   "confidence": 0.85
 }
 
@@ -88,19 +91,19 @@ For INAPPROPRIATE messages:
   "alternatives": [
     {
       "text": "정중한 한국어 대안",
-      "translatedText": "${targetLang} translation",
+      ${needsTranslation ? `"translatedText": "${targetLang} translation",` : ''}
       "reason": "더 정중하고 문화적으로 적절함",
       "formalityLevel": "formal"
     },
     {
       "text": "중간 정도 한국어 대안",
-      "translatedText": "${targetLang} translation",
+      ${needsTranslation ? `"translatedText": "${targetLang} translation",` : ''}
       "reason": "적당한 정중함과 친근함",
       "formalityLevel": "semi-formal"
     },
     {
       "text": "주제 전환 한국어 대안",
-      "translatedText": "${targetLang} translation",
+      ${needsTranslation ? `"translatedText": "${targetLang} translation",` : ''}
       "reason": "민감한 주제를 피하고 안전한 대화로 전환",
       "formalityLevel": "casual"
     }
@@ -172,7 +175,7 @@ IMPORTANT:
         result = {
           type: 'good',
           message: parsed.message || '👍 매너 굿!',
-          basicTranslation: parsed.translation || translateFallback(message, targetCountry),
+          basicTranslation: needsTranslation ? (parsed.translation || translateFallback(message, targetCountry)) : message,
           confidence: parsed.confidence || 0.85
         }
       }
@@ -187,7 +190,7 @@ IMPORTANT:
       result = {
         type: 'good',
         message: '👍 매너 굿!',
-        basicTranslation: translateFallback(message, targetCountry),
+        basicTranslation: needsTranslation ? translateFallback(message, targetCountry) : message,
         confidence: 0.75
       }
     }

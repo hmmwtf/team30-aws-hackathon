@@ -9,7 +9,7 @@ const client = new DynamoDBClient({
   },
 })
 
-async function createTable(tableName, keySchema, attributeDefinitions) {
+async function createTable(tableName, keySchema, attributeDefinitions, globalSecondaryIndexes = null) {
   try {
     // 테이블이 이미 존재하는지 확인
     await client.send(new DescribeTableCommand({ TableName: tableName }))
@@ -26,6 +26,10 @@ async function createTable(tableName, keySchema, attributeDefinitions) {
     KeySchema: keySchema,
     AttributeDefinitions: attributeDefinitions,
     BillingMode: 'PAY_PER_REQUEST'
+  }
+
+  if (globalSecondaryIndexes) {
+    params.GlobalSecondaryIndexes = globalSecondaryIndexes
   }
 
   try {
@@ -59,11 +63,19 @@ async function main() {
     ]
   )
 
-  // Users 테이블
+  // Users 테이블 (이메일 인덱스 포함)
   await createTable(
     'Users',
     [{ AttributeName: 'userId', KeyType: 'HASH' }],
-    [{ AttributeName: 'userId', AttributeType: 'S' }]
+    [
+      { AttributeName: 'userId', AttributeType: 'S' },
+      { AttributeName: 'email', AttributeType: 'S' }
+    ],
+    [{
+      IndexName: 'email-index',
+      KeySchema: [{ AttributeName: 'email', KeyType: 'HASH' }],
+      Projection: { ProjectionType: 'ALL' }
+    }]
   )
 
   console.log('DynamoDB tables setup complete!')

@@ -11,11 +11,11 @@ import CountrySelector from '../components/CountrySelector'
 
 import TranslateMode from '../components/TranslateMode'
 import ProfileSetupModal from '../components/ProfileSetupModal'
-import NotificationTest from '../components/NotificationTest'
+// import NotificationTest from '../components/NotificationTest' // 제거됨
 import { Language, getTranslation } from '../lib/i18n'
 import { Chat } from '../../types/chat'
 
-type Mode = 'chat' | 'translate' | 'test'
+type Mode = 'chat' | 'translate'
 
 export default function MainPage() {
   const auth = useAuth()
@@ -146,7 +146,7 @@ export default function MainPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
         <header className="text-center mb-8 relative">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
@@ -229,21 +229,12 @@ export default function MainPage() {
               >
                 {t('translateMode')}
               </button>
-              <button
-                onClick={() => setMode('test' as Mode)}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  mode === 'test'
-                    ? 'bg-purple-500 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                🔔 알림 테스트
-              </button>
+              {/* 테스트 버튼 제거 - 실제 서비스에서 불필요 */}
             </div>
           </div>
 
           {mode === 'chat' ? (
-            <div className="flex bg-white rounded-lg shadow-lg overflow-hidden h-[600px]">
+            <div className="flex bg-white rounded-lg shadow-lg overflow-hidden h-[750px]"> {/* 600px -> 750px로 확대 */}
               <ChatList 
                 onChatSelect={setSelectedChat}
                 selectedChatId={selectedChat?.id}
@@ -256,6 +247,8 @@ export default function MainPage() {
                     language={selectedLanguage}
                     chatId={selectedChat.id}
                     userId={userId}
+                    receiverLanguage={(selectedChat as any).userReceiverLanguage || 'en'}
+                    relationship={selectedChat.relationship || 'friend'}
                   />
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-500">
@@ -279,7 +272,7 @@ export default function MainPage() {
                 )}
               </div>
             </div>
-          ) : mode === 'translate' ? (
+          ) : (
             <div>
               <CountrySelector 
                 selectedCountry={selectedCountry}
@@ -291,8 +284,6 @@ export default function MainPage() {
                 language={selectedLanguage}
               />
             </div>
-          ) : (
-            <NotificationTest />
           )}
         </div>
       </div>
@@ -303,6 +294,6 @@ export default function MainPage() {
         defaultLanguage={selectedLanguage}
         currentProfile={userProfile}
       />
-    </main>
+    </div>
   )
 }

@@ -32,7 +32,7 @@ export default function MessageInput({ value, onChange, onSend, targetCountry, l
   }
 
   return (
-    <form onSubmit={handleSubmit} className="border-t p-4">
+    <form onSubmit={handleSubmit} className="border-t p-3"> {/* padding 축소 */}
       <div className="flex space-x-2">
         <input
           type="text"
@@ -68,7 +68,7 @@ export default function MessageInput({ value, onChange, onSend, targetCountry, l
           )}
         </button>
       </div>
-      <p className="text-xs text-gray-500 mt-2">
+      <p className="text-xs text-gray-500 mt-1"> {/* margin 축소 */}
         {targetCountry} {t('culturalCheck')}
       </p>
     </form>

@@ -29,20 +29,37 @@ export default function ChatList({ onChatSelect, selectedChatId, currentUserEmai
   }, [currentUserEmail])
 
   const loadChats = async () => {
-    if (!currentUserEmail) return
+    if (!currentUserEmail) {
+      console.log('currentUserEmail이 없어서 채팅 로드 스킵')
+      setIsLoading(false)
+      return
+    }
     
+    console.log('채팅 로드 시작:', currentUserEmail)
     try {
       const response = await fetch(`/api/chats?userEmail=${encodeURIComponent(currentUserEmail)}`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
       const data = await response.json()
+      console.log('채팅 로드 성공:', data.length, '개')
       setChats(data)
     } catch (error) {
       console.error('Failed to load chats:', error)
+      setChats([]) // 오류 시 빈 배열로 설정
     } finally {
       setIsLoading(false)
     }
   }
 
   const handleCreateChat = async (receiverEmail: string, relationship: string) => {
+    if (!currentUserEmail) {
+      alert('사용자 정보를 찾을 수 없습니다.')
+      return
+    }
+    
+    console.log('채팅 생성 시도:', { senderEmail: currentUserEmail, receiverEmail, relationship })
+    
     try {
       const response = await fetch('/api/chat-request', {
         method: 'POST',
@@ -54,19 +71,23 @@ export default function ChatList({ onChatSelect, selectedChatId, currentUserEmai
         })
       })
       
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
       const data = await response.json()
       console.log('채팅 요청 응답:', data)
       
       if (data.success) {
         alert(data.message)
-        loadChats() // 채팅 목록 새로고침
+        await loadChats() // 채팅 목록 새로고침
       } else {
         console.error('채팅 요청 실패:', data)
         alert(data.error || '채팅 요청 실패')
       }
     } catch (error) {
       console.error('Failed to create chat:', error)
-      alert('채팅 요청 중 오류가 발생했습니다.')
+      alert('채팅 요청 중 오류가 발생했습니다: ' + (error as Error).message)
     }
   }
 

@@ -3,13 +3,13 @@
 import { useState, useEffect, useRef } from 'react'
 import MessageInput from './MessageInput'
 import EnhancedMannerFeedback from './EnhancedMannerFeedback'
-// import TestNotification from './TestNotification' // 제거
-// import RelationshipSelector from './RelationshipSelector' // 제거
 import AlternativeSelector from './AlternativeSelector'
+import CustomNotification from './CustomNotification'
 import { Language, getTranslation } from '../lib/i18n'
 import { Message } from '../../types/message'
 import { Chat } from '../../types/chat'
 import { getRandomLoadingMessage } from '../utils/loadingMessages'
+import { showNotification, requestNotificationPermission } from '../utils/notificationUtils'
 
 interface ChatInterfaceProps {
   targetCountry: string
@@ -41,14 +41,27 @@ export default function ChatInterface({ targetCountry, language, chatId, userId,
   const [onlineUsers, setOnlineUsers] = useState<string[]>([])
   const wsRef = useRef<WebSocket | null>(null)
   const [loadingMessage] = useState(getRandomLoadingMessage())
+  const [notification, setNotification] = useState<{
+    title: string
+    message: string
+    type: 'info' | 'success' | 'warning' | 'error'
+  } | null>(null)
 
   useEffect(() => {
     // 브라우저 알림 권한 요청
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().then(permission => {
-        console.log('브라우저 알림 권한:', permission)
-      })
+    const initNotifications = async () => {
+      if ('Notification' in window && Notification.permission === 'default') {
+        const result = await requestNotificationPermission()
+        console.log('🔔 브라우저 알림 권한:', result.permission)
+        if (result.success) {
+          console.log('✅ 알림 권한 허용됨')
+        } else {
+          console.log('❌ 알림 권한 거부:', result.error)
+        }
+      }
     }
+    
+    initNotifications()
     
     if (!chatId) return
 
@@ -80,15 +93,11 @@ export default function ChatInterface({ targetCountry, language, chatId, userId,
         
         // 다른 사용자의 메시지일 때만 알림
         if (data.userId !== userId) {
-          // 브라우저 알림
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('새 메시지', {
-              body: data.message,
-              icon: '/favicon.ico',
-              tag: 'new-message'
-            })
-          }
-          console.log('새 메시지 알림:', data.message)
+          setNotification({
+            title: '새 메시지',
+            message: data.message,
+            type: 'info'
+          })
         }
       }
     }
@@ -496,6 +505,19 @@ export default function ChatInterface({ targetCountry, language, chatId, userId,
             <p className="text-blue-100 text-sm">{t('chatSubtitle')}</p> {/* 폰트 축소 */}
           </div>
           <div className="flex items-center gap-2"> {/* gap 축소 */}
+            <button
+              onClick={() => {
+                setNotification({
+                  title: '테스트 알림',
+                  message: '알림이 정상적으로 작동합니다! 🔔',
+                  type: 'success'
+                })
+              }}
+              className="px-2 py-1 bg-white/20 hover:bg-white/30 rounded text-xs transition-colors"
+              title="알림 테스트"
+            >
+              🔔
+            </button>
             <div className="flex items-center gap-1"> {/* gap 축소 */}
               <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}></div> {/* 크기 축소 */}
               <span className="text-xs">{isConnected ? '연결됨' : '연결 끊어짐'}</span> {/* 폰트 축소 */}
@@ -565,7 +587,7 @@ export default function ChatInterface({ targetCountry, language, chatId, userId,
                         )}
                       </div>
                       <span className="text-xs text-gray-500 ml-2">
-                        {message.userId === userId ? '나' : '상대방'}
+                        {message.userId === userId ? `나 (${userId})` : `상대방 (${message.userId})`}
                       </span>
                     </div>
                     {message.translation && (
@@ -637,6 +659,17 @@ export default function ChatInterface({ targetCountry, language, chatId, userId,
           receiverLanguage={receiverLanguage || 'en'} // 수신자 언어 동적 설정
           onSelect={handleAlternativeSelect}
           onCancel={handleAlternativeCancel}
+        />
+      )}
+      
+      {/* 커스텀 알림 */}
+      {notification && (
+        <CustomNotification
+          title={notification.title}
+          message={notification.message}
+          type={notification.type}
+          duration={3000}
+          onClose={() => setNotification(null)}
         />
       )}
     </div>

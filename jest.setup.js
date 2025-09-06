@@ -7,7 +7,7 @@ global.TextDecoder = TextDecoder
 
 // Mock Next.js Request/Response
 Object.defineProperty(global, 'Request', {
-  value: class Request {
+  value: class MockRequest {
     constructor(url, options = {}) {
       this.url = url
       this.method = options.method || 'GET'
@@ -15,9 +15,32 @@ Object.defineProperty(global, 'Request', {
       this._body = options.body
     }
     async json() {
-      return JSON.parse(this._body)
+      return JSON.parse(this._body || '{}')
     }
-  }
+  },
+  writable: true
+})
+
+Object.defineProperty(global, 'Response', {
+  value: class MockResponse {
+    constructor(body, options = {}) {
+      this.body = body
+      this.status = options.status || 200
+      this.headers = new Map(Object.entries(options.headers || {}))
+    }
+    
+    static json(data, options = {}) {
+      return new MockResponse(JSON.stringify(data), {
+        ...options,
+        headers: { 'Content-Type': 'application/json', ...options.headers }
+      })
+    }
+    
+    async json() {
+      return JSON.parse(this.body)
+    }
+  },
+  writable: true
 })
 
 // i18n 모킹

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import MessageInput from './MessageInput'
 import EnhancedMannerFeedback from './EnhancedMannerFeedback'
-
+import TestNotification from './TestNotification'
 import RelationshipSelector from './RelationshipSelector'
 import AlternativeSelector from './AlternativeSelector'
 import { Language, getTranslation } from '../lib/i18n'
@@ -36,10 +36,18 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
     originalMessage: string
   } | null>(null)
   const [isConnected, setIsConnected] = useState(false)
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([])
   const wsRef = useRef<WebSocket | null>(null)
   const [loadingMessage] = useState(getRandomLoadingMessage())
 
   useEffect(() => {
+    // 브라우저 알림 권한 요청
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then(permission => {
+        console.log('브라우저 알림 권한:', permission)
+      })
+    }
+    
     if (!chatId) return
 
     // WebSocket 연결
@@ -66,6 +74,19 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
           timestamp: data.timestamp
         }
         setMessages(prev => [...prev, newMessage])
+        
+        // 다른 사용자의 메시지일 때만 알림
+        if (data.userId !== userId) {
+          // 브라우저 알림
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('새 메시지', {
+              body: data.message,
+              icon: '/favicon.ico',
+              tag: 'new-message'
+            })
+          }
+          console.log('새 메시지 알림:', data.message)
+        }
       }
     }
 
@@ -376,19 +397,28 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
           <div>
             <h2 className="text-xl font-semibold">{t('chatTitle')}</h2>
             <p className="text-blue-100">{t('chatSubtitle')}</p>
+            {onlineUsers.length > 0 && (
+              <p className="text-blue-200 text-sm mt-1">
+                온라인: {onlineUsers.length}명
+              </p>
+            )}
           </div>
-          <div className="flex items-center gap-2">
-            <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}></div>
-            <span className="text-sm">{isConnected ? 'Connected' : 'Disconnected'}</span>
+          <div className="flex items-center gap-4">
+            {/* WebSocket으로 알림 처리 */}
+            <div className="flex items-center gap-2">
+              <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}></div>
+              <span className="text-sm">{isConnected ? '연결됨' : '연결 끊어짐'}</span>
+            </div>
           </div>
         </div>
       </div>
       
-      <div className="p-4 border-b">
+      <div className="p-4 border-b space-y-3">
         <RelationshipSelector 
           selectedRelationship={selectedRelationship}
           onRelationshipChange={setSelectedRelationship}
         />
+        <TestNotification userId={userId} chatId={chatId} wsRef={wsRef} />
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 space-y-4">

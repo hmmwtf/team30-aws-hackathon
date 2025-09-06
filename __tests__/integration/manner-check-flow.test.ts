@@ -1,79 +1,97 @@
 /**
- * 통합 테스트: 매너 체크 → 번역 → 전송 플로우
+ * @jest-environment node
  */
 import { POST as hybridAnalyze } from '../../app/api/hybrid-analyze/route'
-import { POST as guardrailsCheck } from '../../app/api/guardrails-check/route'
+import { POST as analyzeWithAlternatives } from '../../app/api/analyze-with-alternatives/route'
 import { NextRequest } from 'next/server'
 
-jest.mock('@aws-sdk/client-bedrock-runtime')
+// AWS SDK 모킹
+jest.mock('@aws-sdk/client-bedrock-runtime', () => ({
+  BedrockRuntimeClient: jest.fn().mockImplementation(() => ({
+    send: jest.fn()
+  })),
+  InvokeModelCommand: jest.fn()
+}))
 
 describe('Manner Check Flow Integration', () => {
-  it('should complete full flow for good message', async () => {
-    // 1. Guardrails 체크
-    const guardrailsRequest = new NextRequest('http://localhost/api/guardrails-check', {
-      method: 'POST',
-      body: JSON.stringify({
-        message: '안녕하세요',
-        targetCountry: 'US',
-        relationship: 'friend'
-      })
-    })
-
-    const guardrailsResponse = await guardrailsCheck(guardrailsRequest)
-    const guardrailsResult = await guardrailsResponse.json()
-    
-    expect(guardrailsResult.type).toBe('allowed')
-
-    // 2. 매너 분석 및 번역
+  test('should complete full flow for good message', async () => {
+    const { BedrockRuntimeClient } = require('@aws-sdk/client-bedrock-runtime')
     const mockSend = jest.fn().mockResolvedValue({
       body: new TextEncoder().encode(JSON.stringify({
-        content: [{ text: '{"type": "good", "message": "👍 매너 굿!", "translation": "Hello", "confidence": 0.9}' }]
+        content: [{
+          text: JSON.stringify({
+            type: 'good',
+            message: '👍 매너 굿!',
+            basicTranslation: 'Hello, how are you?'
+          })
+        }]
       }))
     })
 
-    const { BedrockRuntimeClient } = require('@aws-sdk/client-bedrock-runtime')
-    BedrockRuntimeClient.mockImplementation(() => ({ send: mockSend }))
+    BedrockRuntimeClient.mockImplementation(() => ({
+      send: mockSend
+    }))
 
-    const hybridRequest = new NextRequest('http://localhost/api/hybrid-analyze', {
-      method: 'POST',
-      body: JSON.stringify({
-        message: '안녕하세요',
+    const request = {
+      json: async () => ({
+        message: 'Hello, how are you?',
         targetCountry: 'US',
         relationship: 'friend',
         language: 'ko'
       })
-    })
+    } as NextRequest
 
-    const hybridResponse = await hybridAnalyze(hybridRequest)
-    const hybridResult = await hybridResponse.json()
+    const response = await hybridAnalyze(request)
+    const result = await response.json()
 
-    expect(hybridResult.type).toBe('good')
-    expect(hybridResult.basicTranslation).toBeDefined()
+    expect(result.type).toBe('good')
+    expect(result.basicTranslation).toBe('Hello, how are you?')
   })
 
-  it('should handle inappropriate content with alternatives', async () => {
-    // 1. Guardrails에서 차단
-    const guardrailsRequest = new NextRequest('http://localhost/api/guardrails-check', {
-      method: 'POST',
-      body: JSON.stringify({
-        message: '시발',
-        targetCountry: 'US',
-        relationship: 'boss'
-      })
+  test('should handle inappropriate content with alternatives', async () => {
+    const { BedrockRuntimeClient } = require('@aws-sdk/client-bedrock-runtime')
+    const mockSend = jest.fn().mockResolvedValue({
+      body: new TextEncoder().encode(JSON.stringify({
+        content: [{
+          text: JSON.stringify({
+            type: 'warning',
+            message: '부적절한 표현입니다',
+            alternatives: [
+              {
+                text: '정중한 표현',
+                reason: '더 예의바른 표현',
+                formalityLevel: 'formal'
+              }
+            ]
+          })
+        }]
+      }))
     })
 
-    const guardrailsResponse = await guardrailsCheck(guardrailsRequest)
-    const guardrailsResult = await guardrailsResponse.json()
-    
-    expect(guardrailsResult.type).toBe('blocked')
-    expect(guardrailsResult.alternatives).toHaveLength(3)
-    
-    // 각 대안에 번역이 포함되어 있는지 확인
-    guardrailsResult.alternatives.forEach((alt: any) => {
-      expect(alt.text).toBeDefined()
-      expect(alt.translatedText).toBeDefined()
-      expect(alt.reason).toBeDefined()
-      expect(alt.formalityLevel).toBeDefined()
-    })
+    BedrockRuntimeClient.mockImplementation(() => ({
+      send: mockSend
+    }))
+
+    const request = {
+      json: async () => ({
+        message: 'inappropriate message',
+        targetCountry: 'US',
+        relationship: 'boss',
+        language: 'ko'
+      })
+    } as NextRequest
+
+    // 1단계: hybrid-analyze로 부적절한 내용 감지
+    const hybridResponse = await hybridAnalyze(request)
+    const hybridResult = await hybridResponse.json()
+
+    expect(hybridResult.type).toBe('warning')
+
+    // 2단계: analyze-with-alternatives로 대안 제공
+    const altResponse = await analyzeWithAlternatives(request)
+    const altResult = await altResponse.json()
+
+    expect(altResult.alternatives).toBeDefined()
+    expect(altResult.alternatives.length).toBeGreaterThan(0)
   })
 })

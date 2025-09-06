@@ -78,7 +78,7 @@ describe('AlternativeSelector', () => {
     expect(selectButton).not.toBeDisabled()
     
     fireEvent.click(selectButton)
-    expect(mockOnSelect).toHaveBeenCalledWith(mockAlternatives[0].text)
+    expect(mockOnSelect).toHaveBeenCalledWith(mockAlternatives[0].text, undefined)
   })
 
   it('calls onCancel when cancel button is clicked', () => {

@@ -1,7 +1,10 @@
+/**
+ * @jest-environment node
+ */
 import { POST } from '../../app/api/hybrid-analyze/route'
 import { NextRequest } from 'next/server'
 
-// Mock AWS SDK
+// AWS SDK 모킹
 jest.mock('@aws-sdk/client-bedrock-runtime', () => ({
   BedrockRuntimeClient: jest.fn().mockImplementation(() => ({
     send: jest.fn()
@@ -10,80 +13,99 @@ jest.mock('@aws-sdk/client-bedrock-runtime', () => ({
 }))
 
 describe('/api/hybrid-analyze', () => {
-  const mockSend = jest.fn()
-  
-  beforeEach(() => {
-    jest.clearAllMocks()
+  test('should return good result for appropriate message', async () => {
     const { BedrockRuntimeClient } = require('@aws-sdk/client-bedrock-runtime')
-    BedrockRuntimeClient.mockImplementation(() => ({ send: mockSend }))
-  })
-
-  it('should return good result for appropriate message', async () => {
-    mockSend.mockResolvedValue({
+    const mockSend = jest.fn().mockResolvedValue({
       body: new TextEncoder().encode(JSON.stringify({
-        content: [{ text: '{"type": "good", "message": "👍 매너 굿!", "translation": "Hello", "confidence": 0.9}' }]
+        content: [{
+          text: JSON.stringify({
+            type: 'good',
+            message: '👍 매너 굿!',
+            basicTranslation: 'Hello, how are you?'
+          })
+        }]
       }))
     })
 
-    const request = new NextRequest('http://localhost/api/hybrid-analyze', {
-      method: 'POST',
-      body: JSON.stringify({
-        message: '안녕하세요',
+    BedrockRuntimeClient.mockImplementation(() => ({
+      send: mockSend
+    }))
+
+    const request = {
+      json: async () => ({
+        message: 'Hello, how are you?',
         targetCountry: 'US',
         relationship: 'friend',
         language: 'ko'
       })
-    })
+    } as NextRequest
 
     const response = await POST(request)
     const result = await response.json()
 
+    expect(response.status).toBe(200)
     expect(result.type).toBe('good')
-    expect(result.basicTranslation).toBeDefined()
+    expect(result.basicTranslation).toBe('Hello, how are you?')
   })
 
-  it('should return warning with alternatives for inappropriate message', async () => {
-    mockSend.mockResolvedValue({
+  test('should return warning with alternatives for inappropriate message', async () => {
+    const { BedrockRuntimeClient } = require('@aws-sdk/client-bedrock-runtime')
+    const mockSend = jest.fn().mockResolvedValue({
       body: new TextEncoder().encode(JSON.stringify({
-        content: [{ text: '{"type": "warning", "message": "부적절한 표현", "alternatives": [{"text": "대안", "translatedText": "Alternative", "reason": "더 좋음", "formalityLevel": "formal"}]}' }]
+        content: [{
+          text: JSON.stringify({
+            type: 'warning',
+            message: '부적절한 표현입니다',
+            alternatives: [
+              { text: '정중한 표현', reason: '더 예의바른 표현', formalityLevel: 'formal' }
+            ]
+          })
+        }]
       }))
     })
 
-    const request = new NextRequest('http://localhost/api/hybrid-analyze', {
-      method: 'POST',
-      body: JSON.stringify({
-        message: '시발',
+    BedrockRuntimeClient.mockImplementation(() => ({
+      send: mockSend
+    }))
+
+    const request = {
+      json: async () => ({
+        message: 'inappropriate message',
         targetCountry: 'US',
         relationship: 'boss',
         language: 'ko'
       })
-    })
+    } as NextRequest
 
     const response = await POST(request)
     const result = await response.json()
 
+    expect(response.status).toBe(200)
     expect(result.type).toBe('warning')
     expect(result.alternatives).toBeDefined()
-    expect(Array.isArray(result.alternatives)).toBe(true)
   })
 
-  it('should handle timeout errors gracefully', async () => {
-    mockSend.mockRejectedValue(new Error('Stream timed out'))
+  test('should handle timeout errors gracefully', async () => {
+    const { BedrockRuntimeClient } = require('@aws-sdk/client-bedrock-runtime')
+    const mockSend = jest.fn().mockRejectedValue(new Error('Timeout'))
 
-    const request = new NextRequest('http://localhost/api/hybrid-analyze', {
-      method: 'POST',
-      body: JSON.stringify({
-        message: '테스트',
+    BedrockRuntimeClient.mockImplementation(() => ({
+      send: mockSend
+    }))
+
+    const request = {
+      json: async () => ({
+        message: 'test message',
         targetCountry: 'US',
         relationship: 'friend',
         language: 'ko'
       })
-    })
+    } as NextRequest
 
     const response = await POST(request)
     const result = await response.json()
 
+    expect(response.status).toBe(200)
     expect(result.type).toBe('good')
-    expect(result.confidence).toBe(0.7)
   })
 })

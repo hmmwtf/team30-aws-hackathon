@@ -30,7 +30,7 @@ describe('ChatInterface', () => {
     render(<ChatInterface targetCountry="US" language="ko" userId="test-user" />)
     
     expect(screen.getByText('상대방과의 관계')).toBeInTheDocument()
-    expect(screen.getByText('👤 상사')).toBeInTheDocument()
+    expect(screen.getByText('👔 상사')).toBeInTheDocument()
     expect(screen.getByText('👫 친구')).toBeInTheDocument()
   })
 
@@ -43,6 +43,6 @@ describe('ChatInterface', () => {
   test('displays connection status', () => {
     render(<ChatInterface targetCountry="US" language="ko" userId="test-user" />)
     
-    expect(screen.getByText('Disconnected')).toBeInTheDocument()
+    expect(screen.getByText('연결 끊어짐')).toBeInTheDocument()
   })
 })

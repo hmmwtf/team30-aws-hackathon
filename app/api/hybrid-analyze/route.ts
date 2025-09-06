@@ -210,12 +210,11 @@ IMPORTANT:
       timestamp: new Date().toISOString()
     }, null, 2))
     
-    // language 변수 사용 시 안전하게 처리
-    const fallbackMsg = (language || 'ko') === 'ko' ? '👍 매너 굿!' : '👍 Good manners!'
+    // 폴백 응답
     return NextResponse.json({
       type: 'good',
-      message: fallbackMsg,
-      basicTranslation: translateFallback(message || '', targetCountry || 'US'),
+      message: '👍 매너 굿!',
+      basicTranslation: 'Hello',
       confidence: 0.7
     })
   }

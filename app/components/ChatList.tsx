@@ -96,6 +96,29 @@ export default function ChatList({ onChatSelect, selectedChatId, currentUserEmai
     return country ? country.flag : '🌍'
   }
 
+  // 상대방 이메일 추출 함수
+  const getOtherUserEmail = (chat: Chat) => {
+    if (!currentUserEmail || !chat.participants) return chat.name
+    return chat.participants.find(email => email !== currentUserEmail) || chat.name
+  }
+
+  // 관계 라벨 매핑
+  const relationshipLabels: { [key: string]: string } = {
+    'boss': '상사',
+    'colleague': '동료', 
+    'friend': '친구',
+    'lover': '연인',
+    'parent': '부모님',
+    'stranger': '낯선 사람'
+  }
+
+  // 채팅방 표시 이름 생성
+  const getChatDisplayName = (chat: Chat) => {
+    const otherUserEmail = getOtherUserEmail(chat)
+    const relationshipLabel = relationshipLabels[chat.relationship] || chat.relationship
+    return `${otherUserEmail} (${relationshipLabel})`
+  }
+
   if (isLoading) {
     return (
       <div className="w-80 bg-gray-50 border-r flex items-center justify-center">
@@ -143,7 +166,7 @@ export default function ChatList({ onChatSelect, selectedChatId, currentUserEmai
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-lg">{getCountryFlag(chat.country)}</span>
-                    <h3 className="font-medium truncate">{chat.name}</h3>
+                    <h3 className="font-medium truncate">{getChatDisplayName(chat)}</h3>
                   </div>
                   {chat.lastMessage && (
                     <p className="text-sm text-gray-600 truncate mt-1">

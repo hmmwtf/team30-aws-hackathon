@@ -60,12 +60,15 @@ const ws = new WebSocket('ws://localhost:8080');
 ### Chat 타입
 ```typescript
 interface Chat {
-  id: string           // chat_timestamp_randomId
-  name: string         // 채팅방 이름
-  country: string      // 상대방 국가
-  lastMessage: string  // 마지막 메시지
-  timestamp: string    // 생성/수정 시간
-  unread: number       // 읽지 않은 메시지 수
+  id: string              // chat_timestamp_randomId
+  name: string            // 채팅방 이름
+  country: string         // 상대방 국가
+  participants: string[]  // 참가자 이메일 배열
+  relationship: string    // 관계 (boss, colleague, friend, etc.)
+  lastMessage: string     // 마지막 메시지
+  timestamp: string       // 생성/수정 시간
+  unread: number          // 읽지 않은 메시지 수
+  status: string          // 채팅방 상태 (accepted, pending, etc.)
 }
 ```
 
@@ -94,11 +97,11 @@ interface Message {
 ### 1. 기본 메시지 전송 플로우
 ```
 1. 사용자 메시지 입력
-2. 매너 분석 (AWS Bedrock)
-3. 번역 처리 (AWS Translate)
-4. WebSocket으로 실시간 전송
-5. DynamoDB 저장
-6. 상대방에게 실시간 수신
+2. hybrid-analyze API 호출 (매너 체크 + 조건부 번역)
+3. 매너 체크 통과 시:
+   - DynamoDB에 메시지 저장
+   - WebSocket으로 실시간 전송
+4. 상대방에게 실시간 수신
 ```
 
 ### 2. 매너 체크 실패 시 플로우
@@ -202,12 +205,12 @@ AWS_SECRET_ACCESS_KEY=your_secret_key_here
 
 ### 채팅방 관리
 ```
-POST /api/chats
-- Body: { name: string, country: string }
-- Response: Chat 객체
+POST /api/chat-request
+- Body: { senderEmail: string, receiverEmail: string, relationship: string }
+- Response: { success: boolean, chatId: string, message: string }
 
-GET /api/chats
-- Response: Chat[] 배열
+GET /api/chats?userEmail={email}
+- Response: Chat[] 배열 (사용자별 필터링)
 ```
 
 ### 메시지 관리
@@ -222,17 +225,17 @@ POST /api/messages
 
 ### 매너 분석 및 번역
 ```
-POST /api/analyze
-- Body: { message: string, targetCountry: string }
-- Response: { isAppropriate: boolean, feedback: string }
-
-POST /api/translate
-- Body: { text: string, targetLanguage: string }
-- Response: { translatedText: string }
+POST /api/hybrid-analyze
+- Body: { message: string, targetCountry: string, relationship: string, language: string }
+- Response: { type: 'good'|'warning', message: string, basicTranslation?: string, alternatives?: Alternative[] }
 
 POST /api/analyze-with-alternatives
-- Body: { message: string, targetCountry: string }
-- Response: { alternatives: string[], feedback: string }
+- Body: { message: string, targetCountry: string, relationship: string, language: string }
+- Response: { alternatives: Alternative[], feedback: string }
+
+POST /api/translate-analyze
+- Body: { text: string, targetLanguage: string, sourceLanguage: string, targetCountry: string }
+- Response: { translatedText: string, mannerFeedback?: object }
 ```
 
 ## 🔒 보안 및 인증
@@ -312,11 +315,11 @@ fetch('/api/analyze', {
 - [x] DynamoDB 연동
 - [x] 채팅방 관리 API
 
-### Phase 2: 매너 체크 통합 🔄
-- [ ] 실시간 매너 분석 연동
-- [ ] 대안 제시 기능
-- [ ] 번역 자동화
-- [ ] 상태 관리 개선
+### Phase 2: 매너 체크 통합 ✅
+- [x] 실시간 매너 분석 연동 (hybrid-analyze API)
+- [x] 대안 제시 기능 (AlternativeSelector)
+- [x] 조건부 번역 자동화 (한국인끼리는 번역 안함)
+- [x] 상태 관리 개선 (isPending, isAnalyzing)
 
 ### Phase 3: 고급 기능 📋
 - [ ] 사용자 인증 시스템
@@ -341,17 +344,23 @@ fetch('/api/analyze', {
 - `/types/message.ts` - Message 타입 정의
 
 ### API 라우트
-- `/app/api/chats/route.ts` - 채팅방 관리
+- `/app/api/chat-request/route.ts` - 이메일 기반 채팅 요청
+- `/app/api/chats/route.ts` - 채팅방 관리 (사용자별 필터링)
 - `/app/api/messages/route.ts` - 메시지 관리
-- `/app/api/analyze/route.ts` - 매너 분석
-- `/app/api/translate/route.ts` - 번역 서비스
+- `/app/api/hybrid-analyze/route.ts` - 매너 체크 + 조건부 번역
+- `/app/api/analyze-with-alternatives/route.ts` - 대안 제시
+- `/app/api/translate-analyze/route.ts` - 번역 + 매너 분석
 
 ### 컴포넌트
-- `/app/components/ChatInterface.tsx` - 채팅 UI
+- `/app/components/ChatInterface.tsx` - 채팅 UI (실시간 메시지 + 매너 체크)
+- `/app/components/ChatList.tsx` - 채팅방 목록
+- `/app/components/NewChatModal.tsx` - 새 채팅 요청 모달
 - `/app/components/MessageInput.tsx` - 메시지 입력
-- `/app/components/MannerFeedback.tsx` - 매너 피드백
+- `/app/components/AlternativeSelector.tsx` - 대안 선택 모달
+- `/app/components/EnhancedMannerFeedback.tsx` - 향상된 매너 피드백
+- `/app/components/RelationshipSelector.tsx` - 관계 선택
 
 ---
 
-**마지막 업데이트**: 2024년 12월 19일  
-**다음 리뷰**: Phase 2 완료 후
+**마지막 업데이트**: 2025년 1월 6일  
+**다음 리뷰**: Phase 3 고급 기능 개발 시

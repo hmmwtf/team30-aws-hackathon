@@ -273,17 +273,9 @@ export default function MainPage() {
               </div>
             </div>
           ) : (
-            <div>
-              <CountrySelector 
-                selectedCountry={selectedCountry}
-                onCountryChange={setSelectedCountry}
-                language={selectedLanguage}
-              />
-              <TranslateMode 
-                targetCountry={selectedCountry}
-                language={selectedLanguage}
-              />
-            </div>
+            <TranslateMode 
+              language={selectedLanguage}
+            />
           )}
         </div>
       </div>

@@ -5,11 +5,10 @@ import { Language, getTranslation } from '../lib/i18n'
 import EnhancedMannerFeedback from './EnhancedMannerFeedback'
 
 interface TranslateModeProps {
-  targetCountry: string
   language: Language
 }
 
-export default function TranslateMode({ targetCountry, language }: TranslateModeProps) {
+export default function TranslateMode({ language }: TranslateModeProps) {
   const [inputText, setInputText] = useState('')
   const [result, setResult] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -31,8 +30,7 @@ export default function TranslateMode({ targetCountry, language }: TranslateMode
         body: JSON.stringify({
           text: inputText,
           targetLanguage: targetLang,
-          sourceLanguage: 'auto',
-          targetCountry
+          sourceLanguage: 'auto'
         }),
       })
 
@@ -48,34 +46,34 @@ export default function TranslateMode({ targetCountry, language }: TranslateMode
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-2">번역 및 매너 체크</h2>
-        <p className="text-gray-600">텍스트를 입력하면 번역과 함께 문화적 매너를 분석해드립니다.</p>
+        <h2 className="text-xl font-semibold mb-2">{t('mannerCheckTitle')}</h2>
+        <p className="text-gray-600">{t('mannerCheckDesc')}</p>
       </div>
 
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-2">번역할 언어 선택</label>
+          <label className="block text-sm font-medium mb-2">{t('selectTargetLang')}</label>
           <select 
             value={targetLang} 
             onChange={(e) => setTargetLang(e.target.value)}
             className="w-full p-2 border rounded-lg"
           >
-            <option value="en">영어</option>
-            <option value="ko">한국어</option>
-            <option value="ja">일본어</option>
-            <option value="zh">중국어</option>
-            <option value="es">스페인어</option>
-            <option value="fr">프랑스어</option>
-            <option value="de">독일어</option>
+            <option value="en">{language === 'ko' ? '영어' : language === 'ja' ? '英語' : 'English'}</option>
+            <option value="ko">{language === 'ko' ? '한국어' : language === 'ja' ? '韓国語' : 'Korean'}</option>
+            <option value="ja">{language === 'ko' ? '일본어' : language === 'ja' ? '日本語' : 'Japanese'}</option>
+            <option value="zh">{language === 'ko' ? '중국어' : language === 'ja' ? '中国語' : 'Chinese'}</option>
+            <option value="es">{language === 'ko' ? '스페인어' : language === 'ja' ? 'スペイン語' : 'Spanish'}</option>
+            <option value="fr">{language === 'ko' ? '프랑스어' : language === 'ja' ? 'フランス語' : 'French'}</option>
+            <option value="de">{language === 'ko' ? '독일어' : language === 'ja' ? 'ドイツ語' : 'German'}</option>
           </select>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">번역할 텍스트</label>
+          <label className="block text-sm font-medium mb-2">{t('textToTranslate')}</label>
           <textarea
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder="번역하고 싶은 텍스트를 입력하세요..."
+            placeholder={t('textPlaceholder')}
             className="w-full p-3 border rounded-lg h-32 resize-none"
           />
         </div>
@@ -85,25 +83,25 @@ export default function TranslateMode({ targetCountry, language }: TranslateMode
           disabled={isLoading || !inputText.trim()}
           className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 disabled:opacity-50"
         >
-          {isLoading ? '번역 중...' : '번역 및 매너 체크'}
+          {isLoading ? t('mannerChecking') : t('mannerCheckButton')}
         </button>
 
         {result && (
           <div className="mt-6 space-y-4">
             <div className="p-4 bg-gray-50 rounded-lg">
-              <h3 className="font-medium mb-2">원문</h3>
+              <h3 className="font-medium mb-2">{t('originalMessage')}</h3>
               <p>{result.originalText}</p>
-              <p className="text-sm text-gray-500 mt-1">감지된 언어: {result.detectedLanguage}</p>
+              <p className="text-sm text-gray-500 mt-1">{t('detectedLanguage')}: {result.detectedLanguage}</p>
             </div>
 
             <div className="p-4 bg-blue-50 rounded-lg">
-              <h3 className="font-medium mb-2">번역 결과</h3>
+              <h3 className="font-medium mb-2">{t('translationResult')}</h3>
               <p>{result.translatedText}</p>
             </div>
 
             {result.mannerFeedback && (
               <div>
-                <h3 className="font-medium mb-2">문화적 매너 분석</h3>
+                <h3 className="font-medium mb-2">{t('culturalAnalysis')}</h3>
                 <EnhancedMannerFeedback 
                   feedback={{
                     ...result.mannerFeedback,

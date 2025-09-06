@@ -17,6 +17,11 @@ wss.on('connection', (ws) => {
       
       switch (message.type) {
         case 'join':
+          // 간단한 인증 검증
+          if (!message.userId || !message.chatId) {
+            ws.close(1008, 'Missing credentials')
+            return
+          }
           clients.set(ws, { userId: message.userId, chatId: message.chatId })
           onlineUsers.add(message.userId)
           console.log(`[WS] User ${message.userId} joined (${onlineUsers.size} online)`)

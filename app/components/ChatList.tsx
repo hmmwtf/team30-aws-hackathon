@@ -2,18 +2,18 @@
 
 import { useState, useEffect } from 'react'
 import { Chat } from '../../types/chat'
+import NewChatModal from './NewChatModal'
 
 interface ChatListProps {
   onChatSelect: (chat: Chat) => void
   selectedChatId?: string
+  currentUserEmail?: string
 }
 
-export default function ChatList({ onChatSelect, selectedChatId }: ChatListProps) {
+export default function ChatList({ onChatSelect, selectedChatId, currentUserEmail }: ChatListProps) {
   const [chats, setChats] = useState<Chat[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [showNewChatForm, setShowNewChatForm] = useState(false)
-  const [newChatName, setNewChatName] = useState('')
-  const [newChatCountry, setNewChatCountry] = useState('US')
+  const [showNewChatModal, setShowNewChatModal] = useState(false)
 
   const countries = [
     { code: 'US', name: '미국', flag: '🇺🇸' },
@@ -26,11 +26,13 @@ export default function ChatList({ onChatSelect, selectedChatId }: ChatListProps
 
   useEffect(() => {
     loadChats()
-  }, [])
+  }, [currentUserEmail])
 
   const loadChats = async () => {
+    if (!currentUserEmail) return
+    
     try {
-      const response = await fetch('/api/chats')
+      const response = await fetch(`/api/chats?userEmail=${encodeURIComponent(currentUserEmail)}`)
       const data = await response.json()
       setChats(data)
     } catch (error) {
@@ -40,26 +42,31 @@ export default function ChatList({ onChatSelect, selectedChatId }: ChatListProps
     }
   }
 
-  const createChat = async () => {
-    if (!newChatName.trim()) return
-
+  const handleCreateChat = async (receiverEmail: string, relationship: string) => {
     try {
-      const response = await fetch('/api/chats', {
+      const response = await fetch('/api/chat-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: newChatName,
-          country: newChatCountry
+          senderEmail: currentUserEmail,
+          receiverEmail,
+          relationship
         })
       })
       
-      const newChat = await response.json()
-      setChats(prev => [newChat, ...prev])
-      setNewChatName('')
-      setShowNewChatForm(false)
-      onChatSelect(newChat)
+      const data = await response.json()
+      console.log('채팅 요청 응답:', data)
+      
+      if (data.success) {
+        alert(data.message)
+        loadChats() // 채팅 목록 새로고침
+      } else {
+        console.error('채팅 요청 실패:', data)
+        alert(data.error || '채팅 요청 실패')
+      }
     } catch (error) {
       console.error('Failed to create chat:', error)
+      alert('채팅 요청 중 오류가 발생했습니다.')
     }
   }
 
@@ -82,7 +89,7 @@ export default function ChatList({ onChatSelect, selectedChatId }: ChatListProps
         <div className="flex justify-between items-center">
           <h2 className="text-lg font-semibold">채팅방</h2>
           <button
-            onClick={() => setShowNewChatForm(true)}
+            onClick={() => setShowNewChatModal(true)}
             className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
           >
             + 새 채팅
@@ -90,42 +97,11 @@ export default function ChatList({ onChatSelect, selectedChatId }: ChatListProps
         </div>
       </div>
 
-      {showNewChatForm && (
-        <div className="p-4 bg-white border-b">
-          <input
-            type="text"
-            placeholder="채팅방 이름"
-            value={newChatName}
-            onChange={(e) => setNewChatName(e.target.value)}
-            className="w-full p-2 border rounded mb-2"
-          />
-          <select
-            value={newChatCountry}
-            onChange={(e) => setNewChatCountry(e.target.value)}
-            className="w-full p-2 border rounded mb-2"
-          >
-            {countries.map(country => (
-              <option key={country.code} value={country.code}>
-                {country.flag} {country.name}
-              </option>
-            ))}
-          </select>
-          <div className="flex gap-2">
-            <button
-              onClick={createChat}
-              className="flex-1 bg-green-500 text-white py-1 rounded text-sm hover:bg-green-600"
-            >
-              생성
-            </button>
-            <button
-              onClick={() => setShowNewChatForm(false)}
-              className="flex-1 bg-gray-500 text-white py-1 rounded text-sm hover:bg-gray-600"
-            >
-              취소
-            </button>
-          </div>
-        </div>
-      )}
+      <NewChatModal
+        isOpen={showNewChatModal}
+        onClose={() => setShowNewChatModal(false)}
+        onCreateChat={handleCreateChat}
+      />
 
       <div className="flex-1 overflow-y-auto">
         {chats.length === 0 ? (

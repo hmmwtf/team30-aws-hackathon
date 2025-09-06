@@ -22,9 +22,10 @@ export default function MainPage() {
   const router = useRouter()
   const [selectedCountry, setSelectedCountry] = useState('KR') // 기본값, 사용자 프로필에서 업데이트됨
   const [selectedLanguage, setSelectedLanguage] = useState<Language>('ko')
+  const [isProfileLoaded, setIsProfileLoaded] = useState(false)
   const [mode, setMode] = useState<Mode>('chat')
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null)
-  const [userId] = useState(`user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
+  const userId = auth.user?.profile.email || 'unknown'
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [userProfile, setUserProfile] = useState<any>(null)
 
@@ -50,10 +51,14 @@ export default function MainPage() {
       if (data.profile && data.profile.isProfileComplete) {
         setUserProfile(data.profile)
         // DB에 저장된 언어와 국적으로 자동 설정
-        setSelectedLanguage(data.profile.language as Language)
+        const userLanguage = data.profile.language as Language
+        console.log('사용자 언어 설정:', userLanguage)
+        setSelectedLanguage(userLanguage)
         setSelectedCountry(data.profile.nationality)
+        setIsProfileLoaded(true)
       } else {
         setShowProfileModal(true)
+        setIsProfileLoaded(true)
       }
     } catch (error) {
       console.error('프로필 체크 오류:', error)
@@ -78,6 +83,7 @@ export default function MainPage() {
         // 새로 설정한 언어와 국적으로 업데이트
         setSelectedLanguage(language)
         setSelectedCountry(nationality)
+        setIsProfileLoaded(true)
         setShowProfileModal(false)
       }
     } catch (error) {
@@ -241,6 +247,7 @@ export default function MainPage() {
               <ChatList 
                 onChatSelect={setSelectedChat}
                 selectedChatId={selectedChat?.id}
+                currentUserEmail={auth.user?.profile.email}
               />
               <div className="flex-1">
                 {selectedChat ? (

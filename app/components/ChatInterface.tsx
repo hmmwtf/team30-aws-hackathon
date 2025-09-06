@@ -103,13 +103,21 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
   }, [chatId, userId])
 
   const loadMessages = async () => {
-    if (!chatId) return
+    if (!chatId) {
+      console.log('🚫 메시지 로드 스킵: chatId 없음')
+      return
+    }
+    
     try {
       const response = await fetch(`/api/messages?chatId=${chatId}`)
       const data = await response.json()
-      setMessages(data)
+      
+      // 빈 메시지 필터링
+      const validMessages = data.filter(msg => msg.text && msg.text.trim() !== '' && msg.text !== 'undefined')
+      
+      setMessages(validMessages)
     } catch (error) {
-      console.error('Failed to load messages:', error)
+      console.error('😨 메시지 로드 실패:', error)
     }
   }
 
@@ -232,23 +240,46 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
           }
         }
       } else if (result.type === 'good') {
-        // 매너 체크 통과 시 자동으로 번역문 전송
-        setTimeout(() => {
-          if (wsRef.current && isConnected && chatId && result.basicTranslation) {
-            console.log('🚀 전송 데이터:', {
-              original: text,
-              translated: result.basicTranslation,
-              targetCountry,
-              sending: result.basicTranslation
-            })
-            wsRef.current.send(JSON.stringify({
-              type: 'message',
-              message: result.basicTranslation,
-              userId,
-              chatId
-            }))
+        // 매너 체크 통과 시 자동으로 번역문 전송 및 DB 저장
+        setTimeout(async () => {
+          const messageToSend = result.basicTranslation || text
+          
+          try {
+            // 1. DB에 메시지 저장
+            // 빈 메시지 방지
+            if (!messageToSend || messageToSend.trim() === '' || messageToSend === 'undefined') {
+              console.log('⚠️ 빈 메시지 전송 방지')
+              return
+            }
             
-            // 메시지 상태 업데이트
+            const saveResponse = await fetch('/api/messages', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chatId,
+                text: messageToSend,
+                userId: userId,
+                feedback: result
+              })
+            })
+            
+            // 2. WebSocket으로 전송 (실시간 업데이트)
+            if (wsRef.current && isConnected && chatId) {
+              console.log('🚀 전송 데이터:', {
+                original: text,
+                translated: messageToSend,
+                targetCountry,
+                sending: messageToSend
+              })
+              wsRef.current.send(JSON.stringify({
+                type: 'message',
+                message: messageToSend,
+                userId,
+                chatId
+              }))
+            }
+            
+            // 3. 메시지 상태 업데이트
             setMessages(prev => 
               prev.map(msg => 
                 msg.id === newMessage.id 
@@ -256,6 +287,8 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
                   : msg
               )
             )
+          } catch (error) {
+            console.error('메시지 저장 실패:', error)
           }
         }, 1000) // 1초 후 자동 전송
       }
@@ -286,20 +319,45 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
     }
   }
 
-  const handleConfirmSend = (messageId: string) => {
+  const handleConfirmSend = async (messageId: string) => {
     const message = messages.find(m => m.id === messageId)
-    if (message && wsRef.current && isConnected && chatId) {
+    if (message && chatId) {
       // 번역문이 있으면 번역문만, 없으면 원문을 전송
       const messageToSend = message.translatedText || message.text
+      
+      // 빈 메시지 방지
+      if (!messageToSend || messageToSend.trim() === '' || messageToSend === 'undefined') {
+        console.log('⚠️ 빈 메시지 전송 방지')
+        return
+      }
+      
       console.log('📤 전송할 메시지:', messageToSend)
       
-      // WebSocket으로 메시지 전송 (번역문만)
-      wsRef.current.send(JSON.stringify({
-        type: 'message',
-        message: messageToSend,
-        userId,
-        chatId
-      }))
+      try {
+        // 1. DB에 메시지 저장
+        await fetch('/api/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chatId,
+            text: messageToSend,
+            userId,
+            feedback: message.feedback
+          })
+        })
+        
+        // 2. WebSocket으로 전송
+        if (wsRef.current && isConnected) {
+          wsRef.current.send(JSON.stringify({
+            type: 'message',
+            message: messageToSend,
+            userId,
+            chatId
+          }))
+        }
+      } catch (error) {
+        console.error('메시지 저장 실패:', error)
+      }
     }
     
     setMessages(prev => 
@@ -316,20 +374,55 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
   }
 
   const handleAlternativeSelect = async (selectedText: string, translatedText?: string) => {
-    if (!showAlternatives) return
+    if (!showAlternatives || !chatId) return
     
-    // 선택된 대안으로 메시지 업데이트 (이미 번역된 텍스트 사용)
+    const messageToSend = translatedText || selectedText
+    
+    // 빈 메시지 방지
+    if (!messageToSend || messageToSend.trim() === '' || messageToSend === 'undefined') {
+      console.log('⚠️ 빈 대안 메시지 전송 방지')
+      return
+    }
+    
+    try {
+      // 1. DB에 메시지 저장
+      await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatId,
+          text: messageToSend,
+          userId,
+          feedback: { type: 'good', message: '👍 매너 굿! 선택한 표현이 적절합니다.' }
+        })
+      })
+      
+      // 2. WebSocket으로 전송
+      if (wsRef.current && isConnected) {
+        wsRef.current.send(JSON.stringify({
+          type: 'message',
+          message: messageToSend,
+          userId,
+          chatId
+        }))
+      }
+    } catch (error) {
+      console.error('대안 메시지 저장 실패:', error)
+    }
+    
+    // 선택된 대안으로 메시지 업데이트
     setMessages(prev => 
       prev.map(msg => 
         msg.id === showAlternatives.messageId 
           ? { 
               ...msg, 
               text: selectedText, 
-              translatedText: translatedText || selectedText,
+              translatedText: messageToSend,
               feedback: { 
                 type: 'good', 
                 message: '👍 매너 굿! 선택한 표현이 적절합니다.' 
-              } 
+              },
+              isPending: false
             }
           : msg
       )
@@ -437,6 +530,7 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
               } ${
                 message.isPending ? 'border-2 border-yellow-300' : ''
               }`}>
+
                 {/* 복사 버튼 - 오른쪽 맨위 */}
                 {(message.translatedText || message.translation) && (
                   <button
@@ -464,7 +558,7 @@ export default function ChatInterface({ targetCountry, language, chatId, userId 
                     <div className="flex justify-between items-start">
                       <p className="font-medium">{message.text}</p>
                       <span className="text-xs text-gray-500 ml-2">
-                        {message.userId === userId ? 'You' : 'Friend'}
+                        {message.userId === userId ? '나' : '상대방'}
                       </span>
                     </div>
                     {message.translatedText && (
